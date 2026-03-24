@@ -21,6 +21,7 @@ sealed class Screen(val route: String) {
     data object About : Screen("about")
     data object NetWorth : Screen("net_worth")
     data object Export : Screen("export")
+    data object Health : Screen("health")
     data object HealthScore : Screen("health_score")
     data object Achievements : Screen("achievements")
     data object Analytics : Screen("analytics")

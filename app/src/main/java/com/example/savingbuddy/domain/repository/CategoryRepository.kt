@@ -10,6 +10,8 @@ interface CategoryRepository {
     suspend fun getCategoryById(id: String): Category?
     suspend fun addCategory(category: Category)
     suspend fun addDefaultCategories()
+    suspend fun addPresetExpenseCategories() // New method for preset categories
     suspend fun updateCategory(category: Category)
     suspend fun deleteCategory(category: Category)
+    suspend fun deleteAllCategories()
 }

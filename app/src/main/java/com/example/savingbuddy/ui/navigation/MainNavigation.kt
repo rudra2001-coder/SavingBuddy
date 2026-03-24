@@ -133,6 +133,7 @@ fun MainNavigation() {
             composable(Screen.CreditCard.route) { CreditCardScreen(navController = navController) }
             composable(Screen.Recurring.route) { RecurringScreen(navController = navController) }
             composable(Screen.Life.route) { HealthScreen(navController = navController) }
+            composable(Screen.Health.route) { HealthScreen(navController = navController) }
             composable(Screen.AllFunctions.route) { AllFunctionsScreen(navController = navController) }
             composable(Screen.Settings.route) { SettingsScreen(navController = navController) }
             composable(Screen.About.route) { AboutScreen(navController = navController) }

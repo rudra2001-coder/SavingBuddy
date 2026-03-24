@@ -20,12 +20,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.util.Calendar
-import java.util.UUID
+import java.util.*
 import javax.inject.Inject
-
-// Blue color theme for Expense ViewModel
-val BlueExpense = android.graphics.Color.parseColor("#2196F3")
 
 data class AddExpenseUiState(
     val amount: String = "",
@@ -44,8 +40,8 @@ data class AddExpenseUiState(
     val currentMonthSpending: Double = 0.0,
     val selectedDate: Long = System.currentTimeMillis(),
     val showDatePicker: Boolean = false,
-    val quickAmounts: List<Long> = listOf(500, 1000, 2000, 5000, 10000, 20000),
-    val primaryColor: Long = BlueExpense.toLong()
+    val quickAmounts: List<Long> = listOf(500, 1000, 2000, 5000, 10000, 20000, 50000),
+    val isAnalyzing: Boolean = false
 )
 
 @HiltViewModel
@@ -62,12 +58,15 @@ class AddExpenseViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AddExpenseUiState())
     val uiState: StateFlow<AddExpenseUiState> = _uiState.asStateFlow()
 
+    private var analysisJob: kotlinx.coroutines.Job? = null
+
     init {
         loadData()
     }
 
     private fun loadData() {
         viewModelScope.launch {
+            // This will automatically add preset categories if none exist
             categoryRepository.addDefaultCategories()
 
             val accounts = accountRepository.getAllAccounts().first()
@@ -97,6 +96,11 @@ class AddExpenseViewModel @Inject constructor(
         }
     }
 
+    private suspend fun addPresetExpenseCategories() {
+        // Categories are now handled by the repository
+        // This method is kept for backward compatibility
+    }
+
     private fun getMonthStart(calendar: Calendar): Long {
         return (calendar.clone() as Calendar).apply {
             set(Calendar.DAY_OF_MONTH, 1)
@@ -119,27 +123,41 @@ class AddExpenseViewModel @Inject constructor(
 
     fun updateAmount(amount: String) {
         _uiState.value = _uiState.value.copy(amount = amount)
-        analyzeSpending()
+        analyzeSpendingDebounced()
     }
 
-    private fun analyzeSpending() {
+    private fun analyzeSpendingDebounced() {
+        analysisJob?.cancel()
+        analysisJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(500)
+            analyzeSpending()
+        }
+    }
+
+    private suspend fun analyzeSpending() {
         val amount = _uiState.value.amount.toDoubleOrNull() ?: return
         val category = _uiState.value.selectedCategory ?: return
-        
+
         if (amount <= 0) {
-            _uiState.value = _uiState.value.copy(spendingAdvice = null)
+            _uiState.value = _uiState.value.copy(spendingAdvice = null, isAnalyzing = false)
             return
         }
 
-        viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(isAnalyzing = true)
+
+        try {
             val now = Calendar.getInstance()
             val monthStart = getMonthStart(now)
             val monthEnd = getMonthEnd(now)
-            
+
             val currentMonthTransactions = transactionRepository.getTransactionsByDateRange(monthStart, monthEnd).first()
-            val categoryBudget = budgetRepository.getBudgetForCategory(category.id, now.get(Calendar.MONTH), now.get(Calendar.YEAR))
+            val categoryBudget = budgetRepository.getBudgetForCategory(
+                category.id,
+                now.get(Calendar.MONTH),
+                now.get(Calendar.YEAR)
+            )
             val savingsGoals = savingsGoalRepository.getAllSavingsGoals().first()
-            
+
             val advice = spendingAdvisorUseCase.analyzeSpending(
                 amount = amount,
                 categoryId = category.id,
@@ -148,8 +166,10 @@ class AddExpenseViewModel @Inject constructor(
                 totalIncome = _uiState.value.totalIncome,
                 savingsGoals = savingsGoals
             )
-            
-            _uiState.value = _uiState.value.copy(spendingAdvice = advice)
+
+            _uiState.value = _uiState.value.copy(spendingAdvice = advice, isAnalyzing = false)
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(isAnalyzing = false)
         }
     }
 
@@ -164,7 +184,7 @@ class AddExpenseViewModel @Inject constructor(
 
     fun selectCategory(category: Category) {
         _uiState.value = _uiState.value.copy(selectedCategory = category)
-        analyzeSpending()
+        analyzeSpendingDebounced()
     }
 
     fun selectAccount(account: Account) {
@@ -225,12 +245,14 @@ class AddExpenseViewModel @Inject constructor(
             isSaved = false,
             errorMessage = null,
             selectedDate = System.currentTimeMillis(),
-            showDatePicker = false
+            showDatePicker = false,
+            spendingAdvice = null
         )
     }
 
     fun updateDate(date: Long) {
         _uiState.value = _uiState.value.copy(selectedDate = date, showDatePicker = false)
+        analyzeSpendingDebounced()
     }
 
     fun showDatePicker() {
@@ -243,6 +265,20 @@ class AddExpenseViewModel @Inject constructor(
 
     fun setQuickAmount(amount: Long) {
         _uiState.value = _uiState.value.copy(amount = amount.toString())
-        analyzeSpending()
+        analyzeSpendingDebounced()
+    }
+
+    fun navigateDate(days: Int) {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = _uiState.value.selectedDate
+            add(Calendar.DAY_OF_MONTH, days)
+        }
+        _uiState.value = _uiState.value.copy(selectedDate = calendar.timeInMillis)
+        analyzeSpendingDebounced()
+    }
+
+    fun setTodayDate() {
+        _uiState.value = _uiState.value.copy(selectedDate = System.currentTimeMillis())
+        analyzeSpendingDebounced()
     }
 }
