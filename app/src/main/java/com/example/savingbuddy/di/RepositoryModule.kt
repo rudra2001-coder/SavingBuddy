@@ -1,13 +1,7 @@
 package com.example.savingbuddy.di
 
-import com.example.savingbuddy.data.repository.AccountRepositoryImpl
-import com.example.savingbuddy.data.repository.CategoryRepositoryImpl
-import com.example.savingbuddy.data.repository.SavingsGoalRepositoryImpl
-import com.example.savingbuddy.data.repository.TransactionRepositoryImpl
-import com.example.savingbuddy.domain.repository.AccountRepository
-import com.example.savingbuddy.domain.repository.CategoryRepository
-import com.example.savingbuddy.domain.repository.SavingsGoalRepository
-import com.example.savingbuddy.domain.repository.TransactionRepository
+import com.example.savingbuddy.data.repository.*
+import com.example.savingbuddy.domain.repository.*
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +27,60 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSavingsGoalRepository(impl: SavingsGoalRepositoryImpl): SavingsGoalRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBudgetRepository(impl: BudgetRepositoryImpl): BudgetRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRecurringTransactionRepository(impl: RecurringTransactionRepositoryImpl): RecurringTransactionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindLoanRepository(impl: LoanRepositoryImpl): LoanRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCreditCardRepository(impl: CreditCardRepositoryImpl): CreditCardRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHealthRepository(impl: HealthRepositoryImpl): HealthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindJournalRepository(impl: JournalRepositoryImpl): JournalRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHabitRepository(impl: HabitRepositoryImpl): HabitRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAchievementRepository(impl: AchievementRepositoryImpl): AchievementRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFocusSessionRepository(impl: FocusSessionRepositoryImpl): FocusSessionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindTaskRepository(impl: TaskRepositoryImpl): TaskRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMindfulSessionRepository(impl: MindfulSessionRepositoryImpl): MindfulSessionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindUserPreferencesRepository(impl: UserPreferencesRepositoryImpl): UserPreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNetWorthRepository(impl: NetWorthRepositoryImpl): NetWorthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWorkLogRepository(impl: com.example.savingbuddy.data.repository.WorkLogRepositoryImpl): WorkLogRepository
 }

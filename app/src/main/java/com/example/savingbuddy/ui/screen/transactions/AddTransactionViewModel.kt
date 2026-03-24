@@ -3,18 +3,25 @@ package com.example.savingbuddy.ui.screen.transactions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.savingbuddy.domain.model.Account
+import com.example.savingbuddy.domain.model.Budget
 import com.example.savingbuddy.domain.model.Category
 import com.example.savingbuddy.domain.model.Transaction
 import com.example.savingbuddy.domain.model.TransactionType
 import com.example.savingbuddy.domain.repository.AccountRepository
+import com.example.savingbuddy.domain.repository.BudgetRepository
 import com.example.savingbuddy.domain.repository.CategoryRepository
+import com.example.savingbuddy.domain.repository.SavingsGoalRepository
+import com.example.savingbuddy.domain.repository.TransactionRepository
 import com.example.savingbuddy.domain.usecase.AddTransactionUseCase
+import com.example.savingbuddy.domain.usecase.SpendingAdvice
+import com.example.savingbuddy.domain.usecase.SpendingAdvisorUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Calendar
 import java.util.UUID
 import javax.inject.Inject
 
@@ -29,14 +36,24 @@ data class AddTransactionUiState(
     val incomeCategories: List<Category> = emptyList(),
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val spendingAdvice: SpendingAdvice? = null,
+    val totalIncome: Double = 0.0,
+    val currentMonthSpending: Double = 0.0,
+    val selectedDate: Long = System.currentTimeMillis(),
+    val showDatePicker: Boolean = false,
+    val quickAmounts: List<Long> = listOf(500, 1000, 2000, 5000, 10000, 20000)
 )
 
 @HiltViewModel
 class AddTransactionViewModel @Inject constructor(
     private val addTransactionUseCase: AddTransactionUseCase,
     private val accountRepository: AccountRepository,
-    private val categoryRepository: CategoryRepository
+    private val categoryRepository: CategoryRepository,
+    private val transactionRepository: TransactionRepository,
+    private val budgetRepository: BudgetRepository,
+    private val savingsGoalRepository: SavingsGoalRepository,
+    private val spendingAdvisorUseCase: SpendingAdvisorUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddTransactionUiState())
@@ -54,31 +71,97 @@ class AddTransactionViewModel @Inject constructor(
             val expenseCategories = categoryRepository.getCategoriesByType(TransactionType.EXPENSE).first()
             val incomeCategories = categoryRepository.getCategoriesByType(TransactionType.INCOME).first()
 
+            val now = Calendar.getInstance()
+            val monthStart = getMonthStart(now)
+            val monthEnd = getMonthEnd(now)
+
+            val currentMonthTransactions = transactionRepository.getTransactionsByDateRange(monthStart, monthEnd).first()
+            val totalIncome = transactionRepository.getTotalIncome(monthStart, monthEnd).first()
+            val currentMonthSpending = currentMonthTransactions
+                .filter { it.type == TransactionType.EXPENSE }
+                .sumOf { it.amount }
+
             _uiState.value = _uiState.value.copy(
                 accounts = accounts,
                 expenseCategories = expenseCategories,
                 incomeCategories = incomeCategories,
                 selectedAccount = accounts.firstOrNull(),
                 selectedCategory = expenseCategories.firstOrNull(),
-                isLoading = false
+                isLoading = false,
+                totalIncome = totalIncome,
+                currentMonthSpending = currentMonthSpending
             )
         }
     }
 
+    private fun getMonthStart(calendar: Calendar): Long {
+        return (calendar.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    private fun getMonthEnd(calendar: Calendar): Long {
+        return (calendar.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+    }
+
     fun updateAmount(amount: String) {
         _uiState.value = _uiState.value.copy(amount = amount)
+        analyzeSpending()
+    }
+
+    private fun analyzeSpending() {
+        val amount = _uiState.value.amount.toDoubleOrNull() ?: return
+        val category = _uiState.value.selectedCategory ?: return
+        
+        if (amount <= 0) {
+            _uiState.value = _uiState.value.copy(spendingAdvice = null)
+            return
+        }
+
+        viewModelScope.launch {
+            val now = Calendar.getInstance()
+            val monthStart = getMonthStart(now)
+            val monthEnd = getMonthEnd(now)
+            
+            val currentMonthTransactions = transactionRepository.getTransactionsByDateRange(monthStart, monthEnd).first()
+            val categoryBudget = budgetRepository.getBudgetForCategory(category.id, now.get(Calendar.MONTH), now.get(Calendar.YEAR))
+            val savingsGoals = savingsGoalRepository.getAllSavingsGoals().first()
+            
+            val advice = spendingAdvisorUseCase.analyzeSpending(
+                amount = amount,
+                categoryId = category.id,
+                currentMonthTransactions = currentMonthTransactions,
+                categoryBudget = categoryBudget,
+                totalIncome = _uiState.value.totalIncome,
+                savingsGoals = savingsGoals
+            )
+            
+            _uiState.value = _uiState.value.copy(spendingAdvice = advice)
+        }
     }
 
     fun updateType(type: TransactionType) {
         val categories = if (type == TransactionType.EXPENSE) _uiState.value.expenseCategories else _uiState.value.incomeCategories
         _uiState.value = _uiState.value.copy(
             type = type,
-            selectedCategory = categories.firstOrNull()
+            selectedCategory = categories.firstOrNull(),
+            spendingAdvice = null
         )
     }
 
     fun selectCategory(category: Category) {
         _uiState.value = _uiState.value.copy(selectedCategory = category)
+        analyzeSpending()
     }
 
     fun selectAccount(account: Account) {
@@ -113,7 +196,7 @@ class AddTransactionViewModel @Inject constructor(
                     categoryId = category?.id ?: "",
                     accountId = account.id,
                     note = _uiState.value.note.ifBlank { null },
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = _uiState.value.selectedDate,
                     createdAt = System.currentTimeMillis(),
                     updatedAt = System.currentTimeMillis(),
                     isSynced = false
@@ -129,5 +212,39 @@ class AddTransactionViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun resetForm() {
+        val categories = if (_uiState.value.type == TransactionType.EXPENSE) 
+            _uiState.value.expenseCategories 
+        else 
+            _uiState.value.incomeCategories
+        
+        _uiState.value = _uiState.value.copy(
+            amount = "",
+            selectedCategory = categories.firstOrNull(),
+            note = "",
+            isSaved = false,
+            errorMessage = null,
+            selectedDate = System.currentTimeMillis(),
+            showDatePicker = false
+        )
+    }
+
+    fun updateDate(date: Long) {
+        _uiState.value = _uiState.value.copy(selectedDate = date, showDatePicker = false)
+    }
+
+    fun showDatePicker() {
+        _uiState.value = _uiState.value.copy(showDatePicker = true)
+    }
+
+    fun hideDatePicker() {
+        _uiState.value = _uiState.value.copy(showDatePicker = false)
+    }
+
+    fun setQuickAmount(amount: Long) {
+        _uiState.value = _uiState.value.copy(amount = amount.toString())
+        analyzeSpending()
     }
 }

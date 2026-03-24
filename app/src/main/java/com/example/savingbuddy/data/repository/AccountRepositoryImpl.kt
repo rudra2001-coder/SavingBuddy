@@ -1,8 +1,7 @@
 package com.example.savingbuddy.data.repository
 
 import com.example.savingbuddy.data.local.dao.AccountDao
-import com.example.savingbuddy.data.local.mapper.toDomain
-import com.example.savingbuddy.data.local.mapper.toEntity
+import com.example.savingbuddy.data.local.entity.AccountEntity
 import com.example.savingbuddy.domain.model.Account
 import com.example.savingbuddy.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.Flow
@@ -14,27 +13,55 @@ class AccountRepositoryImpl @Inject constructor(
 ) : AccountRepository {
 
     override fun getAllAccounts(): Flow<List<Account>> =
-        accountDao.getAllAccounts().map { list -> list.map { it.toDomain() } }
+        accountDao.getAllAccounts().map { list -> list.mapNotNull { entityToAccount(it) } }
 
     override suspend fun getAccountById(id: String): Account? =
-        accountDao.getAccountById(id)?.toDomain()
+        entityToAccount(accountDao.getAccountById(id))
 
     override fun getTotalBalance(): Flow<Double> =
         accountDao.getTotalBalance().map { it ?: 0.0 }
 
     override suspend fun addAccount(account: Account) {
-        accountDao.insertAccount(account.toEntity())
+        accountDao.insertAccount(accountToEntity(account))
     }
 
     override suspend fun updateAccount(account: Account) {
-        accountDao.updateAccount(account.toEntity())
+        accountDao.updateAccount(accountToEntity(account))
     }
 
     override suspend fun deleteAccount(account: Account) {
-        accountDao.deleteAccount(account.toEntity())
+        accountDao.deleteAccount(accountToEntity(account))
     }
 
     override suspend fun updateBalance(accountId: String, amount: Double) {
         accountDao.updateBalance(accountId, amount)
+    }
+
+    private fun entityToAccount(entity: AccountEntity?): Account? {
+        return entity?.let {
+            Account(
+                id = it.id,
+                name = it.name,
+                balance = it.balance,
+                icon = it.icon,
+                color = it.color,
+                createdAt = it.createdAt,
+                updatedAt = it.updatedAt,
+                isSynced = it.isSynced
+            )
+        }
+    }
+
+    private fun accountToEntity(account: Account): AccountEntity {
+        return AccountEntity(
+            id = account.id,
+            name = account.name,
+            balance = account.balance,
+            icon = account.icon,
+            color = account.color,
+            createdAt = account.createdAt,
+            updatedAt = account.updatedAt,
+            isSynced = false
+        )
     }
 }

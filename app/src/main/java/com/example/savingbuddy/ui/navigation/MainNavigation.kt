@@ -1,18 +1,27 @@
 package com.example.savingbuddy.ui.navigation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -24,10 +33,27 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.savingbuddy.ui.screen.dashboard.DashboardScreen
+import com.example.savingbuddy.ui.screen.loan.LoanScreen
+import com.example.savingbuddy.ui.screen.savings.AddSavingScreen
 import com.example.savingbuddy.ui.screen.savings.SavingsScreen
+import com.example.savingbuddy.ui.screen.creditcard.CreditCardScreen
+import com.example.savingbuddy.ui.screen.recurring.RecurringScreen
+import com.example.savingbuddy.ui.screen.health.HealthScreen
+import com.example.savingbuddy.ui.screen.allfunctions.AllFunctionsScreen
+import com.example.savingbuddy.ui.screen.settings.SettingsScreen
+import com.example.savingbuddy.ui.screen.settings.AboutScreen
+import com.example.savingbuddy.ui.screen.expense.AddExpenseScreen
+import com.example.savingbuddy.ui.screen.income.AddIncomeScreen
 import com.example.savingbuddy.ui.screen.transactions.AddTransactionScreen
 import com.example.savingbuddy.ui.screen.transactions.TransactionsScreen
 import com.example.savingbuddy.ui.screen.transfer.TransferScreen
+import com.example.savingbuddy.ui.screen.networth.NetWorthScreen
+import com.example.savingbuddy.ui.screen.export.ExportScreen
+import com.example.savingbuddy.ui.screen.healthscore.HealthScoreScreen
+import com.example.savingbuddy.ui.screen.achievements.AchievementsScreen
+import com.example.savingbuddy.ui.screen.analytics.AnalyticsScreen
+import com.example.savingbuddy.ui.screen.workcalendar.WorkCalendarScreen
+import com.example.savingbuddy.ui.screen.workreport.WorkReportScreen
 
 data class BottomNavItem(
     val route: String,
@@ -40,7 +66,9 @@ val bottomNavItems = listOf(
     BottomNavItem(Screen.Dashboard.route, "Home", Icons.Filled.Home, Icons.Outlined.Home),
     BottomNavItem(Screen.Transactions.route, "Transactions", Icons.Filled.SwapHoriz, Icons.Outlined.SwapHoriz),
     BottomNavItem(Screen.Savings.route, "Savings", Icons.Filled.Savings, Icons.Outlined.Savings),
-    BottomNavItem(Screen.Insights.route, "Insights", Icons.Filled.Insights, Icons.Outlined.Insights)
+    BottomNavItem(Screen.Insights.route, "Insights", Icons.Filled.Insights, Icons.Outlined.Insights),
+    BottomNavItem(Screen.Life.route, "Life", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
+    BottomNavItem(Screen.AllFunctions.route, "All", Icons.Filled.Apps, Icons.Outlined.Apps)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,12 +111,7 @@ fun MainNavigation() {
         },
         floatingActionButton = {
             if (showBottomBar) {
-                FloatingActionButton(
-                    onClick = { navController.navigate(Screen.AddTransaction.route) },
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Transaction")
-                }
+                QuickAddMenu(navController)
             }
         }
     ) { innerPadding ->
@@ -100,9 +123,109 @@ fun MainNavigation() {
             composable(Screen.Dashboard.route) { DashboardScreen(navController = navController) }
             composable(Screen.Transactions.route) { TransactionsScreen(navController = navController) }
             composable(Screen.AddTransaction.route) { AddTransactionScreen(navController = navController) }
+            composable(Screen.AddIncome.route) { AddIncomeScreen(navController = navController) }
+            composable(Screen.AddExpense.route) { AddExpenseScreen(navController = navController) }
+            composable(Screen.AddSaving.route) { AddSavingScreen(navController = navController) }
             composable(Screen.Savings.route) { SavingsScreen(navController = navController) }
             composable(Screen.Transfer.route) { TransferScreen(navController = navController) }
             composable(Screen.Insights.route) { InsightsScreen(navController = navController) }
+            composable(Screen.Loan.route) { LoanScreen(navController = navController) }
+            composable(Screen.CreditCard.route) { CreditCardScreen(navController = navController) }
+            composable(Screen.Recurring.route) { RecurringScreen(navController = navController) }
+            composable(Screen.Life.route) { HealthScreen(navController = navController) }
+            composable(Screen.AllFunctions.route) { AllFunctionsScreen(navController = navController) }
+            composable(Screen.Settings.route) { SettingsScreen(navController = navController) }
+            composable(Screen.About.route) { AboutScreen(navController = navController) }
+            composable(Screen.NetWorth.route) { NetWorthScreen() }
+            composable(Screen.Export.route) { ExportScreen() }
+            composable(Screen.HealthScore.route) { HealthScoreScreen() }
+            composable(Screen.Achievements.route) { AchievementsScreen() }
+            composable(Screen.Analytics.route) { AnalyticsScreen() }
+            composable(Screen.WorkCalendar.route) { WorkCalendarScreen() }
+            composable(Screen.WorkReport.route) { WorkReportScreen() }
+        }
+    }
+}
+
+@Composable
+fun QuickAddMenu(navController: NavHostController) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        FloatingActionButton(
+            onClick = { expanded = true },
+            containerColor = MaterialTheme.colorScheme.primary
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Quick Add")
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Add Income") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.AddIncome.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Add Expense") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.AddExpense.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Add Transaction") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.AddTransaction.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Add Savings Goal") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.AddSaving.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Recurring Transactions") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.Recurring.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Loans & Debts") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.Loan.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Credit Cards") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.CreditCard.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Settings") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.Settings.route)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("About") },
+                onClick = {
+                    expanded = false
+                    navController.navigate(Screen.About.route)
+                }
+            )
         }
     }
 }

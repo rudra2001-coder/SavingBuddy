@@ -29,4 +29,7 @@ interface SavingsGoalDao {
 
     @Query("UPDATE savings_goals SET currentAmount = currentAmount + :amount WHERE id = :goalId")
     suspend fun addToGoal(goalId: String, amount: Double)
+
+    @Query("DELETE FROM savings_goals")
+    suspend fun deleteAllSavingsGoals()
 }

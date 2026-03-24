@@ -4,18 +4,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -24,9 +30,55 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.savingbuddy.domain.model.Account
+import com.example.savingbuddy.domain.model.SavingsGoal
 import com.example.savingbuddy.ui.screen.dashboard.formatCurrency
 import com.example.savingbuddy.ui.theme.BlueNeutral
 import com.example.savingbuddy.ui.theme.GreenIncome
+import com.example.savingbuddy.ui.theme.RedExpense
+
+enum class TransferType(
+    val displayName: String,
+    val icon: ImageVector,
+    val color: Color,
+    val description: String
+) {
+    ACCOUNT_TO_ACCOUNT(
+        "Account to Account",
+        Icons.Default.SwapHoriz,
+        BlueNeutral,
+        "Transfer between your accounts"
+    ),
+    INCOME_TO_SAVINGS(
+        "Income to Savings",
+        Icons.Default.TrendingUp,
+        GreenIncome,
+        "Move income to savings goal"
+    ),
+    SAVINGS_TO_INCOME(
+        "Savings to Income",
+        Icons.Default.TrendingDown,
+        RedExpense,
+        "Withdraw from savings to account"
+    ),
+    ACCOUNT_TO_SAVINGS(
+        "Account to Savings",
+        Icons.Default.AccountBalance,
+        Color(0xFF4CAF50),
+        "Transfer to savings goal"
+    ),
+    SAVINGS_TO_SAVINGS(
+        "Savings to Savings",
+        Icons.Default.Savings,
+        Color(0xFFE91E63),
+        "Move between savings goals"
+    ),
+    INCOME_TO_INCOME(
+        "Income to Income",
+        Icons.Default.Paid,
+        Color(0xFF9C27B0),
+        "Move income between accounts"
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,6 +87,7 @@ fun TransferScreen(
     viewModel: TransferViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var selectedTransferType by remember { mutableStateOf(TransferType.ACCOUNT_TO_ACCOUNT) }
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
@@ -45,7 +98,7 @@ fun TransferScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Transfer") },
+                title = { Text("Transfer", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -54,106 +107,558 @@ fun TransferScreen(
             )
         }
     ) { padding ->
-        if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Transfer Type Selection
+            Text(
+                text = "Transfer Type",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                TransferCard(
-                    account = uiState.fromAccount,
-                    label = "From",
-                    accounts = uiState.accounts,
-                    onAccountSelected = { viewModel.selectFromAccount(it) },
-                    isFrom = true
-                )
-
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = "Transfer",
-                    tint = BlueNeutral,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(BlueNeutral.copy(alpha = 0.1f), CircleShape)
-                        .padding(8.dp)
-                )
-
-                TransferCard(
-                    account = uiState.toAccount,
-                    label = "To",
-                    accounts = uiState.accounts,
-                    onAccountSelected = { viewModel.selectToAccount(it) },
-                    isFrom = false
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Amount",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                items(TransferType.entries.toList()) { type ->
+                    TransferTypeCard(
+                        type = type,
+                        isSelected = selectedTransferType == type,
+                        onClick = {
+                            selectedTransferType = type
+                            viewModel.setTransferType(type)
+                        }
                     )
+                }
+            }
+
+            HorizontalDivider()
+
+            // Based on transfer type, show different UI
+            when (selectedTransferType) {
+                TransferType.ACCOUNT_TO_ACCOUNT -> {
+                    AccountTransferSection(uiState = uiState, viewModel = viewModel)
+                }
+                TransferType.INCOME_TO_SAVINGS, TransferType.SAVINGS_TO_INCOME -> {
+                    IncomeSavingsTransferSection(uiState = uiState, viewModel = viewModel, isIncomeToSavings = selectedTransferType == TransferType.INCOME_TO_SAVINGS)
+                }
+                TransferType.ACCOUNT_TO_SAVINGS -> {
+                    AccountToSavingsSection(uiState = uiState, viewModel = viewModel)
+                }
+                TransferType.SAVINGS_TO_SAVINGS -> {
+                    SavingsToSavingsSection(uiState = uiState, viewModel = viewModel)
+                }
+                TransferType.INCOME_TO_INCOME -> {
+                    IncomeToIncomeSection(uiState = uiState, viewModel = viewModel)
+                }
+            }
+
+            // Error message
+            uiState.errorMessage?.let { error ->
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Row(
+                        modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "৳",
-                            style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Bold,
-                            color = BlueNeutral
-                        )
-                        TextField(
-                            value = uiState.amount,
-                            onValueChange = { newValue ->
-                                if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
-                                    viewModel.updateAmount(newValue)
-                                }
-                            },
-                            textStyle = MaterialTheme.typography.displaySmall.copy(
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Bold
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            modifier = Modifier.widthIn(min = 100.dp)
-                        )
+                        Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = error, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = { viewModel.clearError() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = MaterialTheme.colorScheme.onErrorContainer)
+                        }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
+            // Confirmation Dialog
+            if (uiState.showConfirmation) {
+                TransferConfirmationDialog(
+                    uiState = uiState,
+                    onConfirm = { viewModel.transfer() },
+                    onDismiss = { viewModel.hideConfirmation() }
+                )
+            }
+        }
+    }
+}
 
-                Button(
-                    onClick = { viewModel.transfer() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    enabled = uiState.accounts.size >= 2
+@Composable
+fun TransferConfirmationDialog(
+    uiState: TransferUiState,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val amount = uiState.amount.toDoubleOrNull() ?: 0.0
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Default.SwapHoriz,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+        },
+        title = { Text("Confirm Transfer", textAlign = TextAlign.Center) },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "৳${String.format("%.2f", amount)}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // From
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Transfer", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ArrowUpward, contentDescription = null, tint = RedExpense)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("From", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                when (uiState.transferType) {
+                                    TransferType.ACCOUNT_TO_ACCOUNT, TransferType.INCOME_TO_INCOME -> uiState.fromAccount?.name ?: "Select account"
+                                    TransferType.INCOME_TO_SAVINGS, TransferType.ACCOUNT_TO_SAVINGS -> uiState.fromAccount?.name ?: "Select account"
+                                    TransferType.SAVINGS_TO_INCOME -> uiState.selectedSavingsGoal?.name ?: "Select savings"
+                                    TransferType.SAVINGS_TO_SAVINGS -> uiState.selectedSavingsGoal?.name ?: "Select savings"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
-
-                if (uiState.accounts.size < 2) {
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // To
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = GreenIncome)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text("To", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                when (uiState.transferType) {
+                                    TransferType.ACCOUNT_TO_ACCOUNT, TransferType.INCOME_TO_INCOME -> uiState.toAccount?.name ?: "Select account"
+                                    TransferType.INCOME_TO_SAVINGS, TransferType.ACCOUNT_TO_SAVINGS, TransferType.SAVINGS_TO_SAVINGS -> uiState.selectedSavingsGoal?.name ?: "Select savings"
+                                    TransferType.SAVINGS_TO_INCOME -> uiState.toAccount?.name ?: "Select account"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+                
+                if (uiState.note.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Need at least 2 accounts to transfer",
+                        text = "Note: ${uiState.note}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("Confirm")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun TransferTypeCard(
+    type: TransferType,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(140.dp)
+            .clickable(onClick = onClick)
+            .then(
+                if (isSelected) Modifier.border(2.dp, type.color, RoundedCornerShape(16.dp))
+                else Modifier
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) type.color.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(type.color.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(type.icon, contentDescription = null, tint = type.color, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = type.displayName,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+fun AccountTransferSection(uiState: TransferUiState, viewModel: TransferViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "From Account",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AccountSelector(
+            selectedAccount = uiState.fromAccount,
+            accounts = uiState.accounts.filter { it.id != uiState.toAccount?.id },
+            onSelect = { viewModel.selectFromAccount(it) }
+        )
+
+        Icon(
+            Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = BlueNeutral,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(32.dp)
+        )
+
+        Text(
+            text = "To Account",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AccountSelector(
+            selectedAccount = uiState.toAccount,
+            accounts = uiState.accounts.filter { it.id != uiState.fromAccount?.id },
+            onSelect = { viewModel.selectToAccount(it) }
+        )
+
+        AmountInput(
+            amount = uiState.amount,
+            onAmountChange = { viewModel.updateAmount(it) },
+            availableBalance = uiState.fromAccount?.balance ?: 0.0
+        )
+    }
+}
+
+@Composable
+fun IncomeSavingsTransferSection(
+    uiState: TransferUiState,
+    viewModel: TransferViewModel,
+    isIncomeToSavings: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Source section
+        if (isIncomeToSavings) {
+            Text(
+                text = "From Income/Account",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AccountSelector(
+                selectedAccount = uiState.fromAccount,
+                accounts = uiState.accounts,
+                onSelect = { viewModel.selectFromAccount(it) }
+            )
+
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = GreenIncome,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(32.dp)
+            )
+
+            Text(
+                text = "To Savings Goal",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            SavingsGoalSelector(
+                selectedGoal = uiState.selectedSavingsGoal,
+                savingsGoals = uiState.savingsGoals,
+                onSelect = { viewModel.selectSavingsGoal(it) }
+            )
+        } else {
+            Text(
+                text = "From Savings Goal",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            SavingsGoalSelector(
+                selectedGoal = uiState.selectedSavingsGoal,
+                savingsGoals = uiState.savingsGoals,
+                onSelect = { viewModel.selectSavingsGoal(it) }
+            )
+
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = RedExpense,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(32.dp)
+            )
+
+            Text(
+                text = "To Account",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AccountSelector(
+                selectedAccount = uiState.toAccount,
+                accounts = uiState.accounts,
+                onSelect = { viewModel.selectToAccount(it) }
+            )
+        }
+
+        AmountInput(
+            amount = uiState.amount,
+            onAmountChange = { viewModel.updateAmount(it) },
+            availableBalance = if (isIncomeToSavings) uiState.fromAccount?.balance ?: 0.0 else uiState.selectedSavingsGoal?.currentAmount ?: 0.0
+        )
+    }
+}
+
+@Composable
+fun AccountToSavingsSection(uiState: TransferUiState, viewModel: TransferViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "From Account",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AccountSelector(
+            selectedAccount = uiState.fromAccount,
+            accounts = uiState.accounts,
+            onSelect = { viewModel.selectFromAccount(it) }
+        )
+
+        Icon(
+            Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = Color(0xFF4CAF50),
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(32.dp)
+        )
+
+        Text(
+            text = "To Savings Goal",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        SavingsGoalSelector(
+            selectedGoal = uiState.selectedSavingsGoal,
+            savingsGoals = uiState.savingsGoals,
+            onSelect = { viewModel.selectSavingsGoal(it) }
+        )
+
+        AmountInput(
+            amount = uiState.amount,
+            onAmountChange = { viewModel.updateAmount(it) },
+            availableBalance = uiState.fromAccount?.balance ?: 0.0
+        )
+    }
+}
+
+@Composable
+fun SavingsToSavingsSection(uiState: TransferUiState, viewModel: TransferViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "From Savings Goal",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        SavingsGoalSelector(
+            selectedGoal = uiState.selectedSavingsGoal,
+            savingsGoals = uiState.savingsGoals,
+            onSelect = { viewModel.selectSavingsGoal(it) }
+        )
+
+        Icon(
+            Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = Color(0xFFE91E63),
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(32.dp)
+        )
+
+        Text(
+            text = "To Savings Goal",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        SavingsGoalSelector(
+            selectedGoal = uiState.toSavingsGoal,
+            savingsGoals = uiState.savingsGoals.filter { it.id != uiState.selectedSavingsGoal?.id },
+            onSelect = { viewModel.selectToSavingsGoal(it) }
+        )
+
+        AmountInput(
+            amount = uiState.amount,
+            onAmountChange = { viewModel.updateAmount(it) },
+            availableBalance = uiState.selectedSavingsGoal?.currentAmount ?: 0.0
+        )
+    }
+}
+
+@Composable
+fun IncomeToIncomeSection(uiState: TransferUiState, viewModel: TransferViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "From Account (Income)",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AccountSelector(
+            selectedAccount = uiState.fromAccount,
+            accounts = uiState.accounts,
+            onSelect = { viewModel.selectFromAccount(it) }
+        )
+
+        Icon(
+            Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = Color(0xFF9C27B0),
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .size(32.dp)
+        )
+
+        Text(
+            text = "To Account",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AccountSelector(
+            selectedAccount = uiState.toAccount,
+            accounts = uiState.accounts.filter { it.id != uiState.fromAccount?.id },
+            onSelect = { viewModel.selectToAccount(it) }
+        )
+
+        AmountInput(
+            amount = uiState.amount,
+            onAmountChange = { viewModel.updateAmount(it) },
+            availableBalance = uiState.fromAccount?.balance ?: 0.0
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountSelector(
+    selectedAccount: Account?,
+    accounts: List<Account>,
+    onSelect: (Account) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { expanded = true }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (selectedAccount != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(selectedAccount.color).copy(alpha = 0.2f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = selectedAccount.name.take(1).uppercase(),
+                            fontWeight = FontWeight.Bold,
+                            color = Color(selectedAccount.color)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = selectedAccount.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                        Text(text = formatCurrency(selectedAccount.balance), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    Text("Select Account", style = MaterialTheme.typography.bodyLarge)
+                }
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
+
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                accounts.forEach { acc ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(acc.name)
+                                }
+                                Text(formatCurrency(acc.balance), fontWeight = FontWeight.SemiBold, color = GreenIncome)
+                            }
+                        },
+                        onClick = {
+                            onSelect(acc)
+                            expanded = false
+                        }
                     )
                 }
             }
@@ -163,102 +668,162 @@ fun TransferScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransferCard(
-    account: Account?,
-    label: String,
-    accounts: List<Account>,
-    onAccountSelected: (Account) -> Unit,
-    isFrom: Boolean
+fun SavingsGoalSelector(
+    selectedGoal: SavingsGoal?,
+    savingsGoals: List<SavingsGoal>,
+    onSelect: (SavingsGoal) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = it }
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { expanded = true }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { expanded = true }
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (account != null) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color(account.color).copy(alpha = 0.2f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = account.name.take(1).uppercase(),
-                                fontWeight = FontWeight.Bold,
-                                color = Color(account.color)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = account.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = formatCurrency(account.balance),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    } else {
+                if (selectedGoal != null) {
+                    Text(text = selectedGoal.icon, style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = selectedGoal.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                         Text(
-                            text = "Select Account",
-                            style = MaterialTheme.typography.bodyLarge
+                            text = "${formatCurrency(selectedGoal.currentAmount)} / ${formatCurrency(selectedGoal.targetAmount)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    LinearProgressIndicator(
+                        progress = { selectedGoal.progress },
+                        modifier = Modifier
+                            .width(60.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = Color(selectedGoal.color),
+                        trackColor = Color(selectedGoal.color).copy(alpha = 0.2f)
+                    )
+                } else {
+                    Text("Select Savings Goal", style = MaterialTheme.typography.bodyLarge)
                 }
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            }
 
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    accounts.forEach { acc ->
+            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                if (savingsGoals.isEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("No savings goals yet") },
+                        onClick = { expanded = false }
+                    )
+                } else {
+                    savingsGoals.forEach { goal ->
                         DropdownMenuItem(
                             text = {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(acc.name)
-                                    Text(formatCurrency(acc.balance), fontWeight = FontWeight.SemiBold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(goal.icon)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(goal.name)
+                                    }
+                                    Text(formatCurrency(goal.currentAmount), fontWeight = FontWeight.SemiBold, color = GreenIncome)
                                 }
                             },
                             onClick = {
-                                onAccountSelected(acc)
+                                onSelect(goal)
                                 expanded = false
                             }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AmountInput(
+    amount: String,
+    onAmountChange: (String) -> Unit,
+    availableBalance: Double
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Amount to Transfer",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "৳",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                TextField(
+                    value = amount,
+                    onValueChange = { newValue ->
+                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                            onAmountChange(newValue)
+                        }
+                    },
+                    textStyle = MaterialTheme.typography.displaySmall.copy(
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    modifier = Modifier.widthIn(min = 100.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Available: ${formatCurrency(availableBalance)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            // Quick amount buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf(100, 500, 1000, 5000).forEach { quickAmount ->
+                    FilterChip(
+                        selected = false,
+                        onClick = { onAmountChange(quickAmount.toString()) },
+                        label = { Text("৳$quickAmount") }
+                    )
                 }
             }
         }
