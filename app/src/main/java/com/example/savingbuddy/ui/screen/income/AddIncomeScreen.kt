@@ -152,6 +152,7 @@ fun AddIncomeScreen(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 32.dp)
+                    .imePadding()
                     .clickable { focusManager.clearFocus() },
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
