@@ -3,11 +3,13 @@ package com.example.savingbuddy.ui.screen.dashboard
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,12 +20,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,150 +49,123 @@ import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
+private val PremiumDeepBlue = Color(0xFF1E3A8A)
+private val PremiumViolet = Color(0xFF7C3AED)
+private val PremiumLightBackground = Color(0xFFF7F9FC)
+private val PremiumDarkBackground = Color(0xFF0F0F14)
+private val PremiumDarkCard = Color(0xFF1A1A24)
+private val PremiumCardLight = Color(0xFFFFFFFF)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     navController: NavHostController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val showFloatingButton by remember { mutableStateOf(true) }
+    val isSystemDark = isSystemInDarkTheme()
 
     LaunchedEffect(Unit) {
         viewModel.initializeDefaultData()
-        delay(500)
     }
 
     Scaffold(
         floatingActionButton = {
-            if (showFloatingButton) {
-                FloatingActionButton(
-                    onClick = { navController.navigate(Screen.AddTransaction.route) },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    shape = CircleShape,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Add Transaction",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+            FloatingActionButton(
+                onClick = { navController.navigate(Screen.AddTransaction.route) },
+                containerColor = PremiumViolet,
+                shape = CircleShape,
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Add Transaction",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
             }
         },
         floatingActionButtonPosition = FabPosition.End
     ) { paddingValues ->
-        LazyColumn(
+        val backgroundColor = if (isSystemDark) PremiumDarkBackground else PremiumLightBackground
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(backgroundColor)
         ) {
-            item {
-                AnimatedGreetingHeader(
-                    totalBalance = uiState.totalBalance,
-                    monthlyIncome = uiState.monthlySummary.totalIncome,
-                    monthlyExpense = uiState.monthlySummary.totalExpense
-                )
-            }
-
-            item {
-                AnimatedBalanceCard(
-                    balance = uiState.totalBalance,
-                    income = uiState.monthlySummary.totalIncome,
-                    expense = uiState.monthlySummary.totalExpense
-                )
-            }
-
-            item {
-                QuickActionsRowEnhanced(navController = navController)
-            }
-
-            uiState.healthScore?.let { score ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 88.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 item {
-                    AnimatedHealthScoreCard(
-                        score = score,
-                        onClick = { navController.navigate(Screen.Health.route) }
+                    GreetingHeader(
+                        totalBalance = uiState.totalBalance,
+                        monthlyIncome = uiState.monthlySummary.totalIncome,
+                        monthlyExpense = uiState.monthlySummary.totalExpense
                     )
                 }
-            }
 
-            if (uiState.budgetStatus.totalBudget > 0) {
                 item {
-                    AnimatedBudgetOverviewCard(
-                        budgetStatus = uiState.budgetStatus,
-                        onClick = { navController.navigate(Screen.Budget.route) }
+                    HeroBalanceCard(
+                        balance = uiState.totalBalance,
+                        income = uiState.monthlySummary.totalIncome,
+                        expense = uiState.monthlySummary.totalExpense
                     )
                 }
-            }
 
-            if (uiState.spendingInsights.isNotEmpty()) {
                 item {
-                    SectionHeader(
-                        title = "Spending Insights",
-                        actionText = "View All",
-                        onActionClick = { navController.navigate(Screen.Analytics.route) }
-                    )
+                    QuickActionsGrid(navController = navController)
                 }
-                items(uiState.spendingInsights) { insight ->
-                    AnimatedSpendingInsightCard(insight = insight)
-                }
-            }
 
-            if (uiState.monthlySummary.totalExpense > 0 || uiState.monthlySummary.savingsRate > 0) {
-                item {
-                    SectionHeader(
-                        title = "Monthly Statistics",
-                        actionText = null,
-                        onActionClick = {}
-                    )
+                uiState.healthScore?.let { score ->
+                    item {
+                        HealthScoreCard(
+                            score = score,
+                            onClick = { navController.navigate(Screen.Health.route) }
+                        )
+                    }
                 }
-                item {
-                    MonthlyStatisticsCard(
-                        savingsRate = uiState.monthlySummary.savingsRate,
-                        dailyAverage = uiState.monthlySummary.dailyAverage,
-                        totalTransactions = uiState.recentTransactions.size
-                    )
-                }
-            }
 
-            if (uiState.savingsGoals.isNotEmpty()) {
-                item {
-                    SectionHeader(
-                        title = "Savings Goals",
-                        actionText = "Add Goal",
-                        onActionClick = { navController.navigate(Screen.Savings.route) }
-                    )
+                if (uiState.budgetStatus.totalBudget > 0) {
+                    item {
+                        BudgetOverviewCard(
+                            budgetStatus = uiState.budgetStatus,
+                            onClick = { navController.navigate(Screen.Budget.route) }
+                        )
+                    }
                 }
-                item {
-                    AnimatedSavingsGoalsRow(goals = uiState.savingsGoals.take(3))
-                }
-            }
 
-            if (uiState.recentTransactions.isNotEmpty()) {
-                item {
-                    SectionHeader(
-                        title = "Recent Transactions",
-                        actionText = "See All",
-                        onActionClick = { navController.navigate(Screen.Transactions.route) }
-                    )
-                }
-                items(uiState.recentTransactions) { transaction ->
-                    AnimatedTransactionItem(
-                        transaction = transaction,
-                        onClick = { }
-                    )
+                if (uiState.recentTransactions.isNotEmpty()) {
+                    item {
+                        SectionHeader(
+                            title = "Recent Transactions",
+                            actionText = "See All",
+                            onActionClick = { navController.navigate(Screen.Transactions.route) }
+                        )
+                    }
+                    items(uiState.recentTransactions.take(5)) { transaction ->
+                        TransactionItem(
+                            transaction = transaction,
+                            onClick = { }
+                        )
+                    }
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun AnimatedGreetingHeader(
+private fun isSystemInDarkTheme(): Boolean {
+    return androidx.compose.foundation.isSystemInDarkTheme()
+}
+
+@Composable
+fun GreetingHeader(
     totalBalance: Double,
     monthlyIncome: Double,
     monthlyExpense: Double
@@ -194,193 +173,167 @@ fun AnimatedGreetingHeader(
     val greeting = getGreeting()
     val netChange = monthlyIncome - monthlyExpense
     val isPositive = netChange >= 0
-
-    var animatedText by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        animatedText = greeting
-    }
+    val isSystemDark = isSystemInDarkTheme()
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = animatedText,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSystemDark) Color.White else Color(0xFF1E293B)
+                )
+                Text(
+                    text = SimpleDateFormat("EEEE, MMM dd", Locale.getDefault()).format(Date()),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isSystemDark) Color.White.copy(alpha = 0.6f) else Color(0xFF64748B)
+                )
+            }
 
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
+                shape = RoundedCornerShape(12.dp),
+                color = PremiumViolet.copy(alpha = 0.1f)
             ) {
                 Text(
                     text = SimpleDateFormat("MMM yyyy", Locale.getDefault()).format(Date()),
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = PremiumViolet,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        AnimatedContent(
-            targetState = netChange,
-            transitionSpec = {
-                fadeIn() + slideInVertically() with fadeOut() + slideOutVertically()
-            }
-        ) { change ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                contentDescription = null,
+                tint = if (isPositive) GreenIncome else RedExpense,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = if (isPositive) "↑ Up ${formatCurrency(change)} this month"
-                       else "↓ Down ${formatCurrency(-change)} this month",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isPositive) GreenIncome else RedExpense,
-                fontSize = 13.sp
+                text = if (isPositive) "+${formatCurrency(netChange)} this month"
+                else "-${formatCurrency(-netChange)} this month",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = if (isPositive) GreenIncome else RedExpense
             )
         }
     }
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun AnimatedBalanceCard(balance: Double, income: Double, expense: Double) {
-    var showCard by remember { mutableStateOf(false) }
+fun HeroBalanceCard(balance: Double, income: Double, expense: Double) {
+    var hideBalance by remember { mutableStateOf(false) }
+    val isSystemDark = isSystemInDarkTheme()
 
-    LaunchedEffect(Unit) {
-        showCard = true
-    }
-
-    AnimatedVisibility(
-        visible = showCard,
-        enter = fadeIn(animationSpec = tween(500)) +
-                slideInVertically(initialOffsetY = { -50 })
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .shadow(12.dp, RoundedCornerShape(24.dp), spotColor = PremiumViolet.copy(alpha = 0.3f))
+            .clip(RoundedCornerShape(24.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = if (isSystemDark) {
+                        listOf(PremiumDeepBlue, PremiumViolet)
+                    } else {
+                        listOf(PremiumDeepBlue.copy(alpha = 0.95f), PremiumViolet.copy(alpha = 0.9f))
+                    },
+                    start = Offset(0f, 0f),
+                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                )
+            )
+            .drawBehind {
+                drawRect(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.15f), Color.Transparent),
+                        start = Offset(0f, 0f),
+                        end = Offset(size.width, size.height / 2)
+                    )
+                )
+            }
     ) {
-        Card(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .shadow(8.dp, RoundedCornerShape(24.dp), spotColor = Color(0xFF4CAF50).copy(alpha = 0.2f)),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            ),
-            shape = RoundedCornerShape(24.dp)
+                .padding(24.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "Total Balance",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                IconButton(
+                    onClick = { hideBalance = !hideBalance },
+                    modifier = Modifier.size(32.dp)
                 ) {
-                    Text(
-                        text = "Total Balance",
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                    Icon(
+                        imageVector = if (hideBalance) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = "Toggle Balance",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
                     )
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.AccountBalanceWallet,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-                AnimatedNumber(
-                    value = balance,
-                    modifier = Modifier.fillMaxWidth(),
-                    textStyle = MaterialTheme.typography.headlineLarge.copy(
+            AnimatedContent(
+                targetState = hideBalance,
+                transitionSpec = { fadeIn() with fadeOut() }
+            ) { hidden ->
+                Text(
+                    text = if (hidden) "••••••••" else formatCurrency(balance),
+                    style = MaterialTheme.typography.headlineLarge.copy(
                         color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 36.sp
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 36.sp,
+                        letterSpacing = (-0.5).sp
                     )
                 )
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.ArrowUpward,
-                                contentDescription = null,
-                                tint = GreenIncome,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Income",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 12.sp
-                            )
-                        }
-                        Text(
-                            text = formatCurrency(income),
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        )
-                    }
-
-                    Column(horizontalAlignment = Alignment.End) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.ArrowDownward,
-                                contentDescription = null,
-                                tint = RedExpense,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Expense",
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 12.sp
-                            )
-                        }
-                        Text(
-                            text = formatCurrency(expense),
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val incomePercentage = if (income > 0) (expense / income).toFloat().coerceIn(0f, 1f) else 0f
-                LinearProgressIndicator(
-                    progress = { incomePercentage },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                    color = RedExpense,
-                    trackColor = GreenIncome.copy(alpha = 0.3f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                StatPill(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.ArrowDownward,
+                    label = "Income",
+                    amount = income,
+                    iconTint = Color(0xFF81C784),
+                    isHidden = hideBalance
+                )
+                StatPill(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Default.ArrowUpward,
+                    label = "Expense",
+                    amount = expense,
+                    iconTint = Color(0xFFE57373),
+                    isHidden = hideBalance
                 )
             }
         }
@@ -388,285 +341,373 @@ fun AnimatedBalanceCard(balance: Double, income: Double, expense: Double) {
 }
 
 @Composable
-fun QuickActionsRowEnhanced(navController: NavHostController) {
-    val quickActions = listOf(
-        QuickAction(Icons.Default.Add, "Expense", RedExpense, Screen.AddExpense.route),
-        QuickAction(Icons.Default.TrendingUp, "Income", GreenIncome, Screen.AddIncome.route),
-        QuickAction(Icons.Default.SwapHoriz, "Transfer", MaterialTheme.colorScheme.primary, Screen.Transfer.route),
-        QuickAction(Icons.Default.Receipt, "History", MaterialTheme.colorScheme.tertiary, Screen.Transactions.route),
-        QuickAction(Icons.Default.Analytics, "Analytics", MaterialTheme.colorScheme.secondary, Screen.Analytics.route),
-        QuickAction(Icons.Default.Savings, "Savings", GreenIncome, Screen.Savings.route),
-        QuickAction(Icons.Default.HealthAndSafety, "Health", Color(0xFF4CAF50), Screen.Health.route),
-        QuickAction(Icons.Default.BarChart, "Budget", Color(0xFF2196F3), Screen.Budget.route)
+private fun StatPill(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    amount: Double,
+    iconTint: Color,
+    isHidden: Boolean
+) {
+    Surface(
+        modifier = modifier,
+        color = Color.White.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(14.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha = 0.15f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = label,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = if (isHidden) "••••" else formatCurrency(amount),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickActionsGrid(navController: NavHostController) {
+    val primaryActions = listOf(
+        QuickActionItem(Icons.Default.Add, "Expense", Screen.AddExpense.route),
+        QuickActionItem(Icons.Default.TrendingUp, "Income", Screen.AddIncome.route),
+        QuickActionItem(Icons.Default.SwapHoriz, "Transfer", Screen.Transfer.route),
+        QuickActionItem(Icons.Default.Savings, "Savings", Screen.Savings.route)
     )
 
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) {
-        items(quickActions) { action ->
-            var isPressed by remember { mutableStateOf(false) }
+    val secondaryActions = listOf(
+        QuickActionItem(Icons.Default.Receipt, "History", Screen.Transactions.route),
+        QuickActionItem(Icons.Default.Analytics, "Analytics", Screen.Analytics.route),
+        QuickActionItem(Icons.Default.HealthAndSafety, "Health", Screen.Health.route),
+        QuickActionItem(Icons.Default.BarChart, "Budget", Screen.Budget.route)
+    )
 
-            val scale by animateFloatAsState(
-                targetValue = if (isPressed) 0.95f else 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
+    val isSystemDark = isSystemInDarkTheme()
+    val cardColor = if (isSystemDark) PremiumDarkCard else PremiumCardLight
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            primaryActions.forEach { action ->
+                QuickActionItemCard(
+                    modifier = Modifier.weight(1f),
+                    action = action,
+                    isPrimary = true,
+                    cardColor = cardColor,
+                    navController = navController
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            secondaryActions.forEach { action ->
+                QuickActionItemCard(
+                    modifier = Modifier.weight(1f),
+                    action = action,
+                    isPrimary = false,
+                    cardColor = cardColor,
+                    navController = navController
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickActionItemCard(
+    modifier: Modifier = Modifier,
+    action: QuickActionItem,
+    isPrimary: Boolean,
+    cardColor: Color,
+    navController: NavHostController
+) {
+    var isPressed by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "scale"
+    )
+
+    Surface(
+        modifier = modifier
+            .scale(scale)
+            .aspectRatio(1f)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                isPressed = true
+                navController.navigate(action.route)
+            },
+        shape = RoundedCornerShape(16.dp),
+        color = cardColor,
+        shadowElevation = if (isPrimary) 2.dp else 1.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            val iconColor = when (action.label) {
+                "Expense" -> RedExpense
+                "Income" -> GreenIncome
+                "Transfer" -> PremiumViolet
+                "Savings" -> GreenIncome
+                else -> if (isPrimary) PremiumViolet else Color(0xFF64748B)
+            }
+
+            Icon(
+                action.icon,
+                contentDescription = action.label,
+                tint = iconColor,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = action.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (isPrimary) FontWeight.SemiBold else FontWeight.Medium,
+                color = if (isPrimary) Color(0xFF1E293B) else Color(0xFF64748B),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            delay(100)
+            isPressed = false
+        }
+    }
+}
+
+@Composable
+fun HealthScoreCard(
+    score: FinancialHealthScore,
+    onClick: () -> Unit
+) {
+    val isSystemDark = isSystemInDarkTheme()
+    val cardColor = if (isSystemDark) PremiumDarkCard else PremiumCardLight
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .clickable(onClick = onClick)
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val animatedScore by animateFloatAsState(
+                targetValue = score.overallScore / 100f,
+                animationSpec = tween(1200, easing = FastOutSlowInEasing),
+                label = "health_score"
             )
 
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .scale(scale)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { navController.navigate(action.route) }
-                    .padding(8.dp)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(64.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(action.color.copy(alpha = 0.1f), CircleShape)
-                        .shadow(4.dp, CircleShape, spotColor = action.color.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        action.icon,
-                        contentDescription = action.label,
-                        tint = action.color,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
+                CircularProgressIndicator(
+                    progress = { animatedScore },
+                    modifier = Modifier.fillMaxSize(),
+                    strokeWidth = 6.dp,
+                    trackColor = Color.Gray.copy(alpha = 0.2f),
+                    color = when {
+                        score.overallScore >= 80 -> Color(0xFF4CAF50)
+                        score.overallScore >= 60 -> Color(0xFFFF9800)
+                        else -> Color(0xFFF44336)
+                    },
+                    strokeCap = StrokeCap.Round
+                )
+
                 Text(
-                    text = action.label,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = "${score.overallScore}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Financial Health",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = score.grade,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        score.overallScore >= 80 -> Color(0xFF4CAF50)
+                        score.overallScore >= 60 -> Color(0xFFFF9800)
+                        else -> Color(0xFFF44336)
+                    }
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = score.recommendations.firstOrNull() ?: "Keep it up!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-    }
-}
 
-@Composable
-fun AnimatedHealthScoreCard(
-    score: FinancialHealthScore,
-    onClick: () -> Unit
-) {
-    var showCard by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        showCard = true
-    }
-
-    AnimatedVisibility(
-        visible = showCard,
-        enter = fadeIn(animationSpec = tween(600)) + slideInHorizontally()
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clickable(onClick = onClick)
-                .shadow(4.dp, RoundedCornerShape(16.dp)),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = "View Details",
+                tint = Color.Gray.copy(alpha = 0.5f)
             )
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Financial Health Score",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "View Details",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val animatedScore by animateFloatAsState(
-                        targetValue = score.overallScore / 100f,
-                        animationSpec = tween(
-                            durationMillis = 1500,
-                            easing = FastOutSlowInEasing
-                        ),
-                        label = "score_animation"
-                    )
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(90.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { animatedScore },
-                            modifier = Modifier.fillMaxSize(),
-                            strokeWidth = 8.dp,
-                            trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f),
-                            color = when {
-                                score.overallScore >= 80 -> Color(0xFF4CAF50)
-                                score.overallScore >= 60 -> Color(0xFFFF9800)
-                                else -> Color(0xFFF44336)
-                            },
-                            strokeCap = StrokeCap.Round
-                        )
-
-                        AnimatedNumber(
-                            value = score.overallScore.toDouble(),
-                            modifier = Modifier,
-                            textStyle = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 28.sp
-                            ),
-                            format = { "${it.toInt()}" }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = score.grade,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = score.recommendations.firstOrNull() ?: "Keep up the good work!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
         }
     }
 }
 
 @Composable
-fun AnimatedBudgetOverviewCard(
+fun BudgetOverviewCard(
     budgetStatus: BudgetStatus,
     onClick: () -> Unit
 ) {
-    var showCard by remember { mutableStateOf(false) }
+    val isSystemDark = isSystemInDarkTheme()
+    val cardColor = if (isSystemDark) PremiumDarkCard else PremiumCardLight
+    val percentage = if (budgetStatus.totalBudget > 0) {
+        (budgetStatus.spent / budgetStatus.totalBudget).toFloat()
+    } else 0f
 
-    LaunchedEffect(Unit) {
-        showCard = true
+    val progressColor = when {
+        percentage < 0.7f -> Color(0xFF4CAF50)
+        percentage < 0.9f -> Color(0xFFFF9800)
+        else -> Color(0xFFF44336)
     }
 
-    AnimatedVisibility(
-        visible = showCard,
-        enter = fadeIn(animationSpec = tween(600)) + slideInVertically()
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .clickable(onClick = onClick)
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clickable(onClick = onClick),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
+        Column(
+            modifier = Modifier.padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = "Budget",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "${(percentage * 100).toInt()}% used",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = progressColor
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val animatedProgress by animateFloatAsState(
+                targetValue = percentage.coerceIn(0f, 1f),
+                animationSpec = tween(800, easing = FastOutSlowInEasing),
+                label = "budget_progress"
+            )
+
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = progressColor,
+                trackColor = progressColor.copy(alpha = 0.2f)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                BudgetStatItem(label = "Spent", value = budgetStatus.spent, color = progressColor)
+                BudgetStatItem(label = "Remaining", value = budgetStatus.remaining, color = Color(0xFF4CAF50))
+                BudgetStatItem(label = "Total", value = budgetStatus.totalBudget, color = Color(0xFF64748B))
+            }
+
+            if (percentage > 0.9f) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFF44336).copy(alpha = 0.1f)
                 ) {
                     Text(
-                        text = "Budget Overview",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "View Details",
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                val percentage = if (budgetStatus.totalBudget > 0) {
-                    (budgetStatus.spent / budgetStatus.totalBudget).toFloat()
-                } else 0f
-
-                val animatedProgress by animateFloatAsState(
-                    targetValue = percentage.coerceIn(0f, 1f),
-                    animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
-                    label = "budget_animation"
-                )
-
-                LinearProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp)),
-                    color = when {
-                        percentage < 0.7f -> Color(0xFF4CAF50)
-                        percentage < 0.9f -> Color(0xFFFF9800)
-                        else -> Color(0xFFF44336)
-                    },
-                    trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    BudgetStat(
-                        label = "Spent",
-                        value = budgetStatus.spent,
-                        color = when {
-                            percentage < 0.7f -> Color(0xFF4CAF50)
-                            percentage < 0.9f -> Color(0xFFFF9800)
-                            else -> Color(0xFFF44336)
-                        }
-                    )
-                    BudgetStat(
-                        label = "Remaining",
-                        value = budgetStatus.remaining,
-                        color = Color(0xFF2196F3)
-                    )
-                    BudgetStat(
-                        label = "Budget",
-                        value = budgetStatus.totalBudget,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-
-                if (percentage > 0.9f) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    WarningChip(
-                        message = "You've used ${(percentage * 100).toInt()}% of your budget!",
-                        color = Color(0xFFF44336)
+                        text = "Budget nearly exhausted!",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFF44336),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )
                 }
             }
@@ -675,12 +716,12 @@ fun AnimatedBudgetOverviewCard(
 }
 
 @Composable
-fun BudgetStat(label: String, value: Double, color: Color) {
-    Column {
+private fun BudgetStatItem(label: String, value: Double, color: Color) {
+    Column(horizontalAlignment = Alignment.Start) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f)
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.Gray.copy(alpha = 0.7f)
         )
         Text(
             text = formatCurrency(value),
@@ -692,356 +733,65 @@ fun BudgetStat(label: String, value: Double, color: Color) {
 }
 
 @Composable
-fun WarningChip(message: String, color: Color) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = color.copy(alpha = 0.1f)
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodySmall,
-            color = color,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-        )
-    }
-}
-
-@Composable
-fun MonthlyStatisticsCard(
-    savingsRate: Float,
-    dailyAverage: Double,
-    totalTransactions: Int
+fun TransactionItem(
+    transaction: Transaction,
+    onClick: () -> Unit
 ) {
+    val isSystemDark = isSystemInDarkTheme()
+    val cardColor = if (isSystemDark) PremiumDarkCard else PremiumCardLight
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF5F5F5)
-        )
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .clickable(onClick = onClick)
+            .shadow(1.dp, RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            StatisticItem(
-                icon = Icons.Default.Savings,
-                label = "Savings Rate",
-                value = "${savingsRate.toInt()}%",
-                color = GreenIncome
-            )
-            StatisticItem(
-                icon = Icons.Default.CalendarToday,
-                label = "Daily Avg",
-                value = formatCurrency(dailyAverage),
-                color = Color(0xFF2196F3)
-            )
-            StatisticItem(
-                icon = Icons.Default.Receipt,
-                label = "Transactions",
-                value = "$totalTransactions",
-                color = Color(0xFFFF9800)
-            )
-        }
-    }
-}
-
-@Composable
-fun StatisticItem(icon: ImageVector, label: String, value: String, color: Color) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = color
-        )
-    }
-}
-
-@Composable
-fun AnimatedSpendingInsightCard(insight: SpendingInsight) {
-    var showCard by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(100)
-        showCard = true
-    }
-
-    AnimatedVisibility(
-        visible = showCard,
-        enter = fadeIn() + slideInHorizontally()
-    ) {
-        val insightColor = when (insight.type) {
-            InsightType.SPENDING_INCREASE -> Color(0xFFF44336)
-            InsightType.SPENDING_DECREASE -> Color(0xFF4CAF50)
-            InsightType.CATEGORY_DOMINANCE -> Color(0xFFFF9800)
-            InsightType.WEEKEND_SPENDING -> Color(0xFF9C27B0)
-            InsightType.DAILY_AVERAGE -> Color(0xFF2196F3)
-            InsightType.BUDGET_WARNING -> Color(0xFFF44336)
-        }
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Row(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(40.dp)
+                    .background(
+                        if (transaction.type == TransactionType.EXPENSE) RedExpense.copy(alpha = 0.1f)
+                        else GreenIncome.copy(alpha = 0.1f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            insightColor.copy(alpha = 0.1f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = when (insight.type) {
-                            InsightType.SPENDING_INCREASE -> Icons.Default.TrendingUp
-                            InsightType.SPENDING_DECREASE -> Icons.Default.TrendingDown
-                            InsightType.CATEGORY_DOMINANCE -> Icons.Default.PieChart
-                            InsightType.WEEKEND_SPENDING -> Icons.Default.CalendarMonth
-                            InsightType.DAILY_AVERAGE -> Icons.Default.Calculate
-                            InsightType.BUDGET_WARNING -> Icons.Default.Warning
-                        },
-                        contentDescription = null,
-                        tint = insightColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = insight.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = insight.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AnimatedSavingsGoalsRow(goals: List<SavingsGoal>) {
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp)
-    ) {
-        items(goals) { goal ->
-            var showCard by remember { mutableStateOf(false) }
-
-            LaunchedEffect(Unit) {
-                delay(100)
-                showCard = true
-            }
-
-            AnimatedVisibility(
-                visible = showCard,
-                enter = fadeIn() + scaleIn()
-            ) {
-                SavingsGoalCardEnhanced(goal = goal)
-            }
-        }
-    }
-}
-
-@Composable
-fun SavingsGoalCardEnhanced(goal: SavingsGoal) {
-    val progress = (goal.currentAmount / goal.targetAmount).toFloat().coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = tween(1000, easing = FastOutSlowInEasing),
-        label = "goal_progress"
-    )
-
-    Card(
-        modifier = Modifier
-            .width(200.dp)
-            .clickable { }
-            .shadow(4.dp, RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = goal.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = goal.icon,
-                    fontSize = 20.sp
+                Icon(
+                    if (transaction.type == TransactionType.EXPENSE) Icons.Default.ShoppingBag
+                    else Icons.Default.AccountBalance,
+                    contentDescription = null,
+                    tint = if (transaction.type == TransactionType.EXPENSE) RedExpense else GreenIncome,
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = Color(goal.color),
-                trackColor = Color(goal.color).copy(alpha = 0.2f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = formatCurrency(goal.currentAmount),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(goal.color)
-                )
-                Text(
-                    text = formatCurrency(goal.targetAmount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${(progress * 100).toInt()}% Complete",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            )
-        }
-    }
-}
-
-@Composable
-fun AnimatedTransactionItem(
-    transaction: Transaction,
-    onClick: () -> Unit
-) {
-    var showItem by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(50)
-        showItem = true
-    }
-
-    AnimatedVisibility(
-        visible = showItem,
-        enter = fadeIn() + slideInHorizontally()
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .clickable(onClick = onClick),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(
-                            if (transaction.type == TransactionType.EXPENSE) RedExpense.copy(alpha = 0.1f)
-                            else GreenIncome.copy(alpha = 0.1f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (transaction.type == TransactionType.EXPENSE) Icons.Default.ShoppingBag
-                        else Icons.Default.AccountBalance,
-                        contentDescription = null,
-                        tint = if (transaction.type == TransactionType.EXPENSE) RedExpense else GreenIncome,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (transaction.type == TransactionType.EXPENSE) "Expense" else "Income",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = formatDate(transaction.timestamp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                        if (transaction.note != null) {
-                            Icon(
-                                Icons.Outlined.Note,
-                                contentDescription = "Has note",
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                            )
-                        }
-                    }
-                }
-                Text(
-                    text = "${if (transaction.type == TransactionType.EXPENSE) "-" else "+"}${formatCurrency(transaction.amount)}",
+                    text = if (transaction.type == TransactionType.EXPENSE) "Expense" else "Income",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (transaction.type == TransactionType.EXPENSE) RedExpense else GreenIncome
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = formatDate(transaction.timestamp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray.copy(alpha = 0.6f)
                 )
             }
+            Text(
+                text = "${if (transaction.type == TransactionType.EXPENSE) "-" else "+"}${formatCurrency(transaction.amount)}",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (transaction.type == TransactionType.EXPENSE) RedExpense else GreenIncome
+            )
         }
     }
 }
@@ -1055,7 +805,7 @@ fun SectionHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1073,55 +823,22 @@ fun SectionHeader(
                 Text(
                     text = actionText,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = PremiumViolet
                 )
                 Icon(
                     Icons.Default.ChevronRight,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = PremiumViolet
                 )
             }
         }
     }
 }
 
-@Composable
-fun AnimatedNumber(
-    value: Double,
-    modifier: Modifier = Modifier,
-    textStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.headlineLarge,
-    format: (Double) -> String = { formatCurrency(it) }
-) {
-    var animatedValue by remember { mutableStateOf(0.0) }
-
-    LaunchedEffect(value) {
-        val startValue = animatedValue
-        val duration = 1000
-        val startTime = System.currentTimeMillis()
-
-        while (System.currentTimeMillis() - startTime < duration) {
-            val elapsed = System.currentTimeMillis() - startTime
-            val progress = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
-            // Manual ease-out cubic calculation
-            val easedProgress = 1 - (1 - progress).let { it * it * it }
-            animatedValue = startValue + (value - startValue) * easedProgress
-            delay(16)
-        }
-        animatedValue = value
-    }
-
-    Text(
-        text = format(animatedValue),
-        style = textStyle,
-        modifier = modifier
-    )
-}
-
-data class QuickAction(
+data class QuickActionItem(
     val icon: ImageVector,
     val label: String,
-    val color: Color,
     val route: String
 )
 

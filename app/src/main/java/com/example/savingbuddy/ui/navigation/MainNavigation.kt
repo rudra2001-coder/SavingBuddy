@@ -1,7 +1,12 @@
 package com.example.savingbuddy.ui.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
@@ -22,9 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -33,6 +38,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.savingbuddy.ui.screen.dashboard.DashboardScreen
+import com.example.savingbuddy.ui.screen.dashboard.AccountsScreen
+import com.example.savingbuddy.ui.screen.dashboard.BudgetScreen
 import com.example.savingbuddy.ui.screen.loan.LoanScreen
 import com.example.savingbuddy.ui.screen.savings.AddSavingScreen
 import com.example.savingbuddy.ui.screen.savings.SavingsScreen
@@ -129,6 +136,8 @@ fun MainNavigation() {
             composable(Screen.Savings.route) { SavingsScreen(navController = navController) }
             composable(Screen.Transfer.route) { TransferScreen(navController = navController) }
             composable(Screen.Insights.route) { InsightsScreen(navController = navController) }
+            composable(Screen.Accounts.route) { AccountsScreen(navController = navController) }
+            composable(Screen.Budget.route) { BudgetScreen(navController = navController) }
             composable(Screen.Loan.route) { LoanScreen(navController = navController) }
             composable(Screen.CreditCard.route) { CreditCardScreen(navController = navController) }
             composable(Screen.Recurring.route) { RecurringScreen(navController = navController) }
@@ -233,5 +242,15 @@ fun QuickAddMenu(navController: NavHostController) {
 
 @Composable
 fun InsightsScreen(navController: NavHostController) {
-    Text("Insights Screen - Coming Soon")
+    // Basic placeholder for Insights screen if not yet implemented in a separate file
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+    ) {
+        Icon(Icons.Default.Insights, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Insights Screen", style = MaterialTheme.typography.headlineMedium)
+        Text("Coming soon: Detailed analysis of your spending and habits.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
 }

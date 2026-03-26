@@ -6,9 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -331,6 +328,16 @@ fun getAllCategories(): List<FunctionCategory> = listOf(
                 category = "Finance"
             ),
             AppFunction(
+                id = "add_transaction",
+                name = "Add Transaction",
+                description = "Quickly record a transaction",
+                icon = Icons.Filled.Add,
+                iconOutline = Icons.Outlined.Add,
+                color = Color(0xFF2196F3),
+                route = Screen.AddTransaction.route,
+                category = "Finance"
+            ),
+            AppFunction(
                 id = "add_income",
                 name = "Add Income",
                 description = "Record your income",
@@ -475,56 +482,6 @@ fun getAllCategories(): List<FunctionCategory> = listOf(
                 category = "Life"
             ),
             AppFunction(
-                id = "journal",
-                name = "Journal",
-                description = "Daily reflections",
-                icon = Icons.Filled.Book,
-                iconOutline = Icons.Outlined.Book,
-                color = Color(0xFF9C27B0),
-                route = "${Screen.Life.route}?tab=journal",
-                category = "Life"
-            ),
-            AppFunction(
-                id = "habits",
-                name = "Habit Tracker",
-                description = "Build daily habits",
-                icon = Icons.Filled.CheckCircle,
-                iconOutline = Icons.Outlined.CheckCircle,
-                color = Color(0xFF673AB7),
-                route = "${Screen.Life.route}?tab=habits",
-                category = "Life"
-            ),
-            AppFunction(
-                id = "tasks",
-                name = "Task Planner",
-                description = "Daily tasks",
-                icon = Icons.Filled.TaskAlt,
-                iconOutline = Icons.Outlined.TaskAlt,
-                color = Color(0xFF2196F3),
-                route = "${Screen.Life.route}?tab=tasks",
-                category = "Life"
-            ),
-            AppFunction(
-                id = "focus",
-                name = "Focus Session",
-                description = "Deep work timer",
-                icon = Icons.Filled.Timer,
-                iconOutline = Icons.Outlined.Timer,
-                color = Color(0xFFFF9800),
-                route = "${Screen.Life.route}?tab=focus",
-                category = "Life"
-            ),
-            AppFunction(
-                id = "mindful",
-                name = "Mindful Breaks",
-                description = "Relaxation exercises",
-                icon = Icons.Filled.SelfImprovement,
-                iconOutline = Icons.Outlined.SelfImprovement,
-                color = Color(0xFF00BCD4),
-                route = "${Screen.Life.route}?tab=mindful",
-                category = "Life"
-            ),
-            AppFunction(
                 id = "achievements",
                 name = "Achievements",
                 description = "Your accomplishments",
@@ -590,26 +547,33 @@ fun getAllCategories(): List<FunctionCategory> = listOf(
                 color = Color(0xFF4CAF50),
                 route = Screen.Export.route,
                 category = "Insights"
+            )
+        )
+    ),
+    FunctionCategory(
+        name = "System",
+        icon = Icons.Default.Settings,
+        color = Color(0xFF607D8B),
+        functions = listOf(
+            AppFunction(
+                id = "settings",
+                name = "Settings",
+                description = "App preferences & backup",
+                icon = Icons.Filled.Settings,
+                iconOutline = Icons.Outlined.Settings,
+                color = Color(0xFF607D8B),
+                route = Screen.Settings.route,
+                category = "System"
             ),
             AppFunction(
-                id = "future_checker",
-                name = "Future Reality",
-                description = "Project your savings",
-                icon = Icons.Filled.TrendingFlat,
-                iconOutline = Icons.Outlined.TrendingFlat,
-                color = Color(0xFF455A64),
-                route = "${Screen.Insights.route}?tab=future",
-                category = "Insights"
-            ),
-            AppFunction(
-                id = "spending_advisor",
-                name = "Spending Advisor",
-                description = "Get spend advice",
-                icon = Icons.Filled.Lightbulb,
-                iconOutline = Icons.Outlined.Lightbulb,
-                color = Color(0xFFFFC107),
-                route = Screen.AddExpense.route,
-                category = "Insights"
+                id = "about",
+                name = "About",
+                description = "App information & version",
+                icon = Icons.Filled.Info,
+                iconOutline = Icons.Outlined.Info,
+                color = Color(0xFF607D8B),
+                route = Screen.About.route,
+                category = "System"
             )
         )
     )
