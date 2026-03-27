@@ -61,6 +61,9 @@ import com.example.savingbuddy.ui.screen.achievements.AchievementsScreen
 import com.example.savingbuddy.ui.screen.analytics.AnalyticsScreen
 import com.example.savingbuddy.ui.screen.workcalendar.WorkCalendarScreen
 import com.example.savingbuddy.ui.screen.workreport.WorkReportScreen
+import com.example.savingbuddy.ui.screen.backup.BackupScreen
+import com.example.savingbuddy.ui.screen.savings.AddSavingsScreen
+import com.example.savingbuddy.ui.screen.insights.InsightsScreen
 
 data class BottomNavItem(
     val route: String,
@@ -71,9 +74,6 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(Screen.Dashboard.route, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(Screen.Transactions.route, "Transactions", Icons.Filled.SwapHoriz, Icons.Outlined.SwapHoriz),
-    BottomNavItem(Screen.Savings.route, "Savings", Icons.Filled.Savings, Icons.Outlined.Savings),
-    BottomNavItem(Screen.Insights.route, "Insights", Icons.Filled.Insights, Icons.Outlined.Insights),
     BottomNavItem(Screen.Life.route, "Life", Icons.Filled.Favorite, Icons.Outlined.FavoriteBorder),
     BottomNavItem(Screen.AllFunctions.route, "All", Icons.Filled.Apps, Icons.Outlined.Apps)
 )
@@ -116,11 +116,7 @@ fun MainNavigation() {
                 }
             }
         },
-        floatingActionButton = {
-            if (showBottomBar) {
-                QuickAddMenu(navController)
-            }
-        }
+
     ) { innerPadding ->
         NavHost(
             navController = navController,
@@ -135,7 +131,6 @@ fun MainNavigation() {
             composable(Screen.AddSaving.route) { AddSavingScreen(navController = navController) }
             composable(Screen.Savings.route) { SavingsScreen(navController = navController) }
             composable(Screen.Transfer.route) { TransferScreen(navController = navController) }
-            composable(Screen.Insights.route) { InsightsScreen(navController = navController) }
             composable(Screen.Accounts.route) { AccountsScreen(navController = navController) }
             composable(Screen.Budget.route) { BudgetScreen(navController = navController) }
             composable(Screen.Loan.route) { LoanScreen(navController = navController) }
@@ -153,104 +148,11 @@ fun MainNavigation() {
             composable(Screen.Analytics.route) { AnalyticsScreen() }
             composable(Screen.WorkCalendar.route) { WorkCalendarScreen() }
             composable(Screen.WorkReport.route) { WorkReportScreen() }
+            composable(Screen.Backup.route) { BackupScreen() }
+            composable(Screen.AddSavings.route) { AddSavingsScreen(onNavigateBack = { navController.popBackStack() }) }
+            composable(Screen.Insights.route) { InsightsScreen() }
         }
     }
 }
 
-@Composable
-fun QuickAddMenu(navController: NavHostController) {
-    var expanded by remember { mutableStateOf(false) }
 
-    Box {
-        FloatingActionButton(
-            onClick = { expanded = true },
-            containerColor = MaterialTheme.colorScheme.primary
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Quick Add")
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            DropdownMenuItem(
-                text = { Text("Add Income") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.AddIncome.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Add Expense") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.AddExpense.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Add Transaction") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.AddTransaction.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Add Savings Goal") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.AddSaving.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Recurring Transactions") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.Recurring.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Loans & Debts") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.Loan.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Credit Cards") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.CreditCard.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("Settings") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.Settings.route)
-                }
-            )
-            DropdownMenuItem(
-                text = { Text("About") },
-                onClick = {
-                    expanded = false
-                    navController.navigate(Screen.About.route)
-                }
-            )
-        }
-    }
-}
-
-@Composable
-fun InsightsScreen(navController: NavHostController) {
-    // Basic placeholder for Insights screen if not yet implemented in a separate file
-    Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-    ) {
-        Icon(Icons.Default.Insights, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("Insights Screen", style = MaterialTheme.typography.headlineMedium)
-        Text("Coming soon: Detailed analysis of your spending and habits.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-    }
-}

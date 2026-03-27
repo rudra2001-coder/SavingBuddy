@@ -415,11 +415,21 @@ fun getAllCategories(): List<FunctionCategory> = listOf(
                 category = "Savings & Loans"
             ),
             AppFunction(
-                id = "add_saving",
-                name = "Add Savings Goal",
-                description = "Create new goal",
+                id = "add_savings",
+                name = "Add Savings",
+                description = "Add to general savings",
                 icon = Icons.Filled.AddCircle,
                 iconOutline = Icons.Outlined.AddCircle,
+                color = Color(0xFF4CAF50),
+                route = Screen.AddSavings.route,
+                category = "Savings & Loans"
+            ),
+            AppFunction(
+                id = "add_saving_goal",
+                name = "Add Savings Goal",
+                description = "Create new savings goal",
+                icon = Icons.Filled.Flag,
+                iconOutline = Icons.Outlined.Flag,
                 color = Color(0xFF8BC34A),
                 route = Screen.AddSaving.route,
                 category = "Savings & Loans"
@@ -556,9 +566,19 @@ fun getAllCategories(): List<FunctionCategory> = listOf(
         color = Color(0xFF607D8B),
         functions = listOf(
             AppFunction(
+                id = "backup",
+                name = "Backup & Restore",
+                description = "Backup & restore your data",
+                icon = Icons.Filled.Backup,
+                iconOutline = Icons.Outlined.Backup,
+                color = Color(0xFF4CAF50),
+                route = Screen.Backup.route,
+                category = "System"
+            ),
+            AppFunction(
                 id = "settings",
                 name = "Settings",
-                description = "App preferences & backup",
+                description = "App preferences",
                 icon = Icons.Filled.Settings,
                 iconOutline = Icons.Outlined.Settings,
                 color = Color(0xFF607D8B),

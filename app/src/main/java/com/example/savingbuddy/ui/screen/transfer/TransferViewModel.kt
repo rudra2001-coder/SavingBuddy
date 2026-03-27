@@ -119,6 +119,7 @@ class TransferViewModel @Inject constructor(
                     TransferType.ACCOUNT_TO_SAVINGS -> handleAccountToSavings(amount)
                     TransferType.SAVINGS_TO_SAVINGS -> handleSavingsToSavings(amount)
                     TransferType.INCOME_TO_INCOME -> handleIncomeToIncome(amount)
+                    else -> {}
                 }
                 _uiState.value = _uiState.value.copy(isSaved = true)
             } catch (e: Exception) {

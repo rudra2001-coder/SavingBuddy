@@ -44,6 +44,21 @@ import java.util.*
 import javax.inject.Inject
 import kotlin.math.roundToInt
 
+data class TimelineItem(
+    val id: String,
+    val timestamp: Long,
+    val type: TimelineType,
+    val title: String,
+    val subtitle: String,
+    val amount: Double? = null,
+    val icon: String,
+    val color: Color
+)
+
+enum class TimelineType {
+    WORK_LOG, INCOME, EXPENSE, TRANSFER, SAVINGS
+}
+
 data class WorkReportUiState(
     val isLoading: Boolean = true,
     val workLogs: List<WorkLog> = emptyList(),
@@ -58,7 +73,9 @@ data class WorkReportUiState(
     val productivityScore: Int = 0,
     val showExportDialog: Boolean = false,
     val isExporting: Boolean = false,
-    val exportMessage: String? = null
+    val exportMessage: String? = null,
+    val timelineItems: List<TimelineItem> = emptyList(),
+    val showTimeline: Boolean = true
 )
 
 data class MonthlyWorkData(
@@ -89,8 +106,10 @@ enum class ReportFilter(val displayName: String, val icon: String) {
     THIS_YEAR("This Year", "📈"),
     CUSTOM("Custom Range", "🔍"),
     OVERTIME("Overtime", "⏰"),
-    OFFICE("Office Days", "🏢"),
-    HOME_OFFICE("Home Office", "🏠"),
+    OFFICE("Office", "🏢"),
+    HOME("Home", "🏠"),
+    REMOTE("Remote", "📡"),
+    HOLIDAY("Holiday", "🎉"),
     LEAVES("Leaves", "🏖️")
 }
 
@@ -112,6 +131,11 @@ class WorkReportViewModel @Inject constructor(
     private fun loadReports() {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
+            val thirtyDaysAgo = calendar.apply {
+                add(Calendar.DAY_OF_YEAR, -30)
+                set(Calendar.HOUR_OF_DAY, 0)
+            }.timeInMillis
+            
             val startOfYear = calendar.apply {
                 set(Calendar.DAY_OF_YEAR, 1)
                 set(Calendar.HOUR_OF_DAY, 0)
@@ -124,6 +148,7 @@ class WorkReportViewModel @Inject constructor(
             val breakdown = logs.groupBy { it.dayType }.mapValues { it.value.size }
             val monthlyData = generateMonthlyData(logs)
             val productivityScore = calculateProductivityScore(summary, logs.size)
+            val timelineItems = generateTimelineItems(logs)
             
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
@@ -133,7 +158,22 @@ class WorkReportViewModel @Inject constructor(
                 reportSections = sections,
                 dayTypeBreakdown = breakdown,
                 monthlyData = monthlyData,
-                productivityScore = productivityScore
+                productivityScore = productivityScore,
+                timelineItems = timelineItems
+            )
+        }
+    }
+
+    private fun generateTimelineItems(logs: List<WorkLog>): List<TimelineItem> {
+        return logs.sortedByDescending { it.date }.take(30).map { log ->
+            TimelineItem(
+                id = log.id,
+                timestamp = log.date,
+                type = TimelineType.WORK_LOG,
+                title = log.dayType.displayName,
+                subtitle = "${log.workHours.toInt()}h work${if (log.overtimeHours > 0) " + ${log.overtimeHours.toInt()}h OT" else ""}",
+                icon = log.dayType.icon,
+                color = getDayTypeColor(log.dayType)
             )
         }
     }
@@ -226,8 +266,10 @@ class WorkReportViewModel @Inject constructor(
             
             val filtered = when (filter) {
                 ReportFilter.OFFICE -> logs.filter { it.dayType == WorkDayType.OFFICE }
-                ReportFilter.HOME_OFFICE -> logs.filter { it.dayType == WorkDayType.HOME_OFFICE }
-                ReportFilter.LEAVES -> logs.filter { it.dayType in listOf(WorkDayType.SICK_LEAVE, WorkDayType.PAID_LEAVE, WorkDayType.UNPAID_LEAVE, WorkDayType.HOLIDAY) }
+                ReportFilter.HOME -> logs.filter { it.dayType == WorkDayType.HOME || it.dayType == WorkDayType.HOME_OFFICE }
+                ReportFilter.REMOTE -> logs.filter { it.dayType == WorkDayType.REMOTE }
+                ReportFilter.HOLIDAY -> logs.filter { it.dayType == WorkDayType.HOLIDAY || it.dayType == WorkDayType.OFF_DAY }
+                ReportFilter.LEAVES -> logs.filter { it.dayType in listOf(WorkDayType.SICK_LEAVE, WorkDayType.PAID_LEAVE, WorkDayType.UNPAID_LEAVE) }
                 ReportFilter.OVERTIME -> logs.filter { it.dayType == WorkDayType.OVERTIME || it.overtimeHours > 0 }
                 else -> logs
             }
@@ -236,6 +278,7 @@ class WorkReportViewModel @Inject constructor(
             val breakdown = filtered.groupBy { it.dayType }.mapValues { it.value.size }
             val monthlyData = generateMonthlyData(filtered)
             val productivityScore = calculateProductivityScore(summary, filtered.size)
+            val timelineItems = generateTimelineItems(filtered)
             
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
@@ -246,9 +289,14 @@ class WorkReportViewModel @Inject constructor(
                 reportSections = sections,
                 dayTypeBreakdown = breakdown,
                 monthlyData = monthlyData,
-                productivityScore = productivityScore
+                productivityScore = productivityScore,
+                timelineItems = timelineItems
             )
         }
+    }
+
+    fun toggleTimeline() {
+        _uiState.value = _uiState.value.copy(showTimeline = !_uiState.value.showTimeline)
     }
 
     private fun getDateRangeForFilter(filter: ReportFilter): Pair<Long, Long> {
@@ -364,19 +412,46 @@ fun WorkReportScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.showExportDialog() },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.FileDownload, contentDescription = "Export")
-            }
-        }
+        topBar = {
+            TopAppBar(
+                title = { Text("Work Reports", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { viewModel.showExportDialog() }) {
+                        Icon(Icons.Default.FileDownload, contentDescription = "Export")
+                    }
+                }
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         if (uiState.isLoading) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
+            }
+        } else if (uiState.workLogs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "📋",
+                        style = MaterialTheme.typography.displayLarge
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No work logs yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Add entries from the Work Calendar",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         } else {
             LazyColumn(
@@ -384,18 +459,54 @@ fun WorkReportScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Text(
-                        text = "Work Reports",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "This Year",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${uiState.workLogs.size} days logged",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 item {
-                    ProductivityScoreCard(score = uiState.productivityScore)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        StatCard(
+                            title = "Work Days",
+                            value = "${uiState.summary?.totalWorkDays ?: 0}",
+                            icon = "💼",
+                            color = Color(0xFF2196F3),
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Hours",
+                            value = "${uiState.summary?.totalWorkHours?.toInt() ?: 0}h",
+                            icon = "⏱️",
+                            color = Color(0xFF4CAF50),
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Overtime",
+                            value = "${uiState.summary?.totalOvertimeHours?.toInt() ?: 0}h",
+                            icon = "⏰",
+                            color = Color(0xFFF44336),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 item {
@@ -410,32 +521,16 @@ fun WorkReportScreen(
                     }
                 }
 
-                uiState.dateRange?.let { (start, end) ->
-                    item {
-                        Text(
-                            text = "${SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(start))} - ${SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(end))}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
                 if (uiState.dayTypeBreakdown.isNotEmpty()) {
                     item {
-                        DayTypePieChart(breakdown = uiState.dayTypeBreakdown)
-                    }
-                }
-
-                if (uiState.monthlyData.isNotEmpty()) {
-                    item {
                         Text(
-                            text = "Monthly Overview",
+                            text = "Work Type Distribution",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                     item {
-                        MonthlyBarChart(data = uiState.monthlyData)
+                        SimpleBarChart(breakdown = uiState.dayTypeBreakdown)
                     }
                 }
 
@@ -447,37 +542,62 @@ fun WorkReportScreen(
                     )
                 }
 
-                items(uiState.reportSections.chunked(2)) { rowSections ->
+                item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        rowSections.forEach { section ->
-                            ReportCard(section = section, modifier = Modifier.weight(1f))
-                        }
-                        if (rowSections.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
+                        StatCard(
+                            title = "Office",
+                            value = "${uiState.summary?.totalOfficeDays ?: 0}",
+                            icon = "🏢",
+                            color = Color(0xFF2196F3),
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Home",
+                            value = "${uiState.summary?.totalHomeOfficeDays ?: 0}",
+                            icon = "🏠",
+                            color = Color(0xFF9C27B0),
+                            modifier = Modifier.weight(1f)
+                        )
+                        StatCard(
+                            title = "Off",
+                            value = "${uiState.summary?.totalOffDays ?: 0}",
+                            icon = "🌴",
+                            color = Color(0xFFFF9800),
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
 
                 if (uiState.filteredLogs.isNotEmpty()) {
                     item {
                         HorizontalDivider()
-                        Text(
-                            text = "Recent Logs (${uiState.filteredLogs.size} entries)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Recent Logs",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${uiState.filteredLogs.size} entries",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    items(uiState.filteredLogs.sortedByDescending { it.date }.take(20)) { log ->
+                    items(uiState.filteredLogs.sortedByDescending { it.date }.take(15)) { log ->
                         WorkLogItem(log = log)
                     }
                 }
 
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
             }
         }
     }
@@ -488,6 +608,40 @@ fun WorkReportScreen(
             onDismiss = { viewModel.hideExportDialog() },
             isExporting = uiState.isExporting
         )
+    }
+}
+
+@Composable
+fun StatCard(
+    title: String,
+    value: String,
+    icon: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(text = icon, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -548,54 +702,52 @@ fun ProductivityScoreCard(score: Int) {
 }
 
 @Composable
-fun DayTypePieChart(breakdown: Map<WorkDayType, Int>) {
+fun SimpleBarChart(breakdown: Map<WorkDayType, Int>) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Day Type Distribution",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier.size(120.dp)
+            val total = breakdown.values.sum()
+            val sortedBreakdown = breakdown.entries.sortedByDescending { it.value }.take(6)
+            
+            sortedBreakdown.forEach { (type, count) ->
+                val percentage = if (total > 0) (count.toFloat() / total) else 0f
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val total = breakdown.values.sum().toFloat()
-                        var startAngle = -90f
-                        breakdown.forEach { (type, count) ->
-                            val sweepAngle = (count / total) * 360f
-                            drawArc(
-                                color = getDayTypeColor(type),
-                                startAngle = startAngle,
-                                sweepAngle = sweepAngle,
-                                useCenter = true
-                            )
-                            startAngle += sweepAngle
-                        }
+                    Text(
+                        text = type.icon,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.width(32.dp)
+                    )
+                    Text(
+                        text = type.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.width(80.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(20.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(getDayTypeColor(type).copy(alpha = 0.2f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(percentage)
+                                .height(20.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(getDayTypeColor(type))
+                        )
                     }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    breakdown.forEach { (type, count) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(12.dp).background(getDayTypeColor(type), CircleShape))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "${type.displayName}: $count",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "$count",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -779,4 +931,59 @@ fun ExportDialog(onExport: () -> Unit, onDismiss: () -> Unit, isExporting: Boole
             }
         }
     )
+}
+
+@Composable
+fun TimelineItemCard(item: TimelineItem) {
+    val dateFormat = SimpleDateFormat("EEE, MMM dd • HH:mm", Locale.getDefault())
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = item.color.copy(alpha = 0.08f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(item.color.copy(alpha = 0.2f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = item.icon, style = MaterialTheme.typography.titleMedium)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = item.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = dateFormat.format(Date(item.timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            item.amount?.let { amount ->
+                Text(
+                    text = formatCurrency(amount),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (amount >= 0) Color(0xFF4CAF50) else Color(0xFFF44336)
+                )
+            }
+        }
+    }
 }

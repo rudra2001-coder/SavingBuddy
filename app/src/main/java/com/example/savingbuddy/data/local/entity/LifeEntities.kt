@@ -101,15 +101,19 @@ data class MindfulSessionEntity(
 
 enum class WorkDayType {
     WORKDAY,
-    HOME_OFFICE,
     OFFICE,
+    HOME,
+    REMOTE,
+    HOME_OFFICE,
     OFF_DAY,
-    OVERTIME,
     HOLIDAY,
     SICK_LEAVE,
     PAID_LEAVE,
     UNPAID_LEAVE,
-    BUSINESS_TRIP
+    OVERTIME,
+    BUSINESS_TRIP,
+    TRAVEL,
+    CUSTOM
 }
 
 @Entity(tableName = "work_logs")

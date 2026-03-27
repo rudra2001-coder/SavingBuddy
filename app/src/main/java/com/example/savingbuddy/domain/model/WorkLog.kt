@@ -15,15 +15,19 @@ data class WorkLog(
 
 enum class WorkDayType(val displayName: String, val icon: String, val workHoursDefault: Float) {
     WORKDAY("Workday", "💼", 8f),
-    HOME_OFFICE("Home Office", "🏠", 8f),
     OFFICE("Office", "🏢", 8f),
+    HOME("Home", "🏠", 8f),
+    REMOTE("Remote", "📡", 8f),
+    HOME_OFFICE("Home Office", "🏡", 8f),
     OFF_DAY("Off Day", "🌴", 0f),
-    OVERTIME("Overtime", "⏰", 8f),
     HOLIDAY("Holiday", "🎉", 0f),
     SICK_LEAVE("Sick Leave", "🤒", 0f),
     PAID_LEAVE("Paid Leave", "🏖️", 0f),
     UNPAID_LEAVE("Unpaid Leave", "❌", 0f),
-    BUSINESS_TRIP("Business Trip", "✈️", 8f)
+    OVERTIME("Overtime", "⏰", 8f),
+    BUSINESS_TRIP("Business Trip", "✈️", 8f),
+    TRAVEL("Travel", "🚄", 8f),
+    CUSTOM("Custom", "⭐", 8f)
 }
 
 data class WorkLogSummary(

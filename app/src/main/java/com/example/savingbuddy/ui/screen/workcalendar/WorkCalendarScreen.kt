@@ -92,10 +92,12 @@ class WorkCalendarViewModel @Inject constructor(
             currentMonth = month, 
             currentYear = year,
             quickApplyOptions = listOf(
-                QuickApplyOption("All Workdays", WorkDayType.WORKDAY, "💼"),
+                QuickApplyOption("Workday", WorkDayType.WORKDAY, "💼"),
                 QuickApplyOption("Office", WorkDayType.OFFICE, "🏢"),
-                QuickApplyOption("Home Office", WorkDayType.HOME_OFFICE, "🏠"),
-                QuickApplyOption("Full Month Off", WorkDayType.OFF_DAY, "🌴")
+                QuickApplyOption("Home", WorkDayType.HOME, "🏠"),
+                QuickApplyOption("Remote", WorkDayType.REMOTE, "📡"),
+                QuickApplyOption("Holiday", WorkDayType.HOLIDAY, "🎉"),
+                QuickApplyOption("Off Day", WorkDayType.OFF_DAY, "🌴")
             )
         )
         loadCalendar()
@@ -257,8 +259,16 @@ class WorkCalendarViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showDayTypeDialog = true)
     }
 
+    fun showDayTypeDialogForDate(date: Long) {
+        _uiState.value = _uiState.value.copy(
+            showDayTypeDialog = true,
+            selectedDateForNote = date,
+            selectedDates = setOf(date)
+        )
+    }
+
     fun hideDayTypeDialog() {
-        _uiState.value = _uiState.value.copy(showDayTypeDialog = false)
+        _uiState.value = _uiState.value.copy(showDayTypeDialog = false, selectedDateForNote = null)
     }
 
     fun setSelectedDayType(type: WorkDayType) {
@@ -271,20 +281,30 @@ class WorkCalendarViewModel @Inject constructor(
             val dates = state.selectedDates.toList()
             val dayType = state.selectedDayType
             
-            val workLogs = dates.map { date ->
-                WorkLog(
-                    date = date,
+            if (dates.isEmpty() && state.selectedDateForNote != null) {
+                val workLog = WorkLog(
+                    date = state.selectedDateForNote,
                     dayType = dayType,
                     workHours = dayType.workHoursDefault,
                     overtimeHours = if (dayType == WorkDayType.OVERTIME) 2f else 0f
                 )
+                workLogRepository.addWorkLog(workLog)
+            } else {
+                val workLogs = dates.map { date ->
+                    WorkLog(
+                        date = date,
+                        dayType = dayType,
+                        workHours = dayType.workHoursDefault,
+                        overtimeHours = if (dayType == WorkDayType.OVERTIME) 2f else 0f
+                    )
+                }
+                workLogRepository.addWorkLogs(workLogs)
             }
-            
-            workLogRepository.addWorkLogs(workLogs)
             
             _uiState.value = state.copy(
                 showDayTypeDialog = false,
                 selectedDates = emptySet(),
+                selectedDateForNote = null,
                 isSelectionMode = false,
                 isLoading = true
             )
@@ -533,7 +553,7 @@ fun WorkCalendarScreen(viewModel: WorkCalendarViewModel = hiltViewModel()) {
                                 viewModel.toggleDateSelection(day.date)
                             } else {
                                 day.workLog?.let { viewModel.showNoteDialog(day.date) }
-                                    ?: run { viewModel.showDayTypeDialog() }
+                                    ?: run { viewModel.showDayTypeDialogForDate(day.date) }
                             }
                         },
                         onLongClick = {
@@ -739,15 +759,19 @@ fun CalendarDayItem(
 
 fun getDayTypeColor(type: WorkDayType): Color = when (type) {
     WorkDayType.WORKDAY -> Color(0xFF2196F3)
+    WorkDayType.OFFICE -> Color(0xFF2196F3)
+    WorkDayType.HOME -> Color(0xFF4CAF50)
+    WorkDayType.REMOTE -> Color(0xFF9C27B0)
     WorkDayType.HOME_OFFICE -> Color(0xFF9C27B6)
-    WorkDayType.OFFICE -> Color(0xFF4CAF50)
     WorkDayType.OFF_DAY -> Color(0xFFFF9800)
-    WorkDayType.OVERTIME -> Color(0xFFF44336)
-    WorkDayType.HOLIDAY -> Color(0xFFE91E63)
-    WorkDayType.SICK_LEAVE -> Color(0xFF795548)
+    WorkDayType.HOLIDAY -> Color(0xFFFF9800)
+    WorkDayType.SICK_LEAVE -> Color(0xFFF44336)
     WorkDayType.PAID_LEAVE -> Color(0xFF00BCD4)
     WorkDayType.UNPAID_LEAVE -> Color(0xFF607D8B)
+    WorkDayType.OVERTIME -> Color(0xFFF44336)
     WorkDayType.BUSINESS_TRIP -> Color(0xFF3F51B5)
+    WorkDayType.TRAVEL -> Color(0xFF00BCD4)
+    WorkDayType.CUSTOM -> Color(0xFFFFEB3B)
 }
 
 @Composable

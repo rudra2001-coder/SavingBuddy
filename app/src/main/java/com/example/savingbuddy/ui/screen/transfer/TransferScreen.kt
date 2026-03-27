@@ -48,26 +48,38 @@ enum class TransferType(
         BlueNeutral,
         "Transfer between your accounts"
     ),
-    INCOME_TO_SAVINGS(
-        "Income to Savings",
+    ACCOUNT_TO_GENERAL_SAVINGS(
+        "To General Savings",
         Icons.Default.TrendingUp,
         GreenIncome,
+        "Transfer to general savings"
+    ),
+    GENERAL_SAVINGS_TO_ACCOUNT(
+        "From General Savings",
+        Icons.Default.TrendingDown,
+        RedExpense,
+        "Withdraw from general savings"
+    ),
+    INCOME_TO_SAVINGS(
+        "Income to Goal",
+        Icons.Default.Flag,
+        Color(0xFF4CAF50),
         "Move income to savings goal"
     ),
     SAVINGS_TO_INCOME(
-        "Savings to Income",
-        Icons.Default.TrendingDown,
-        RedExpense,
-        "Withdraw from savings to account"
+        "Goal to Income",
+        Icons.Default.AccountBalance,
+        Color(0xFFFF9800),
+        "Withdraw from goal to account"
     ),
     ACCOUNT_TO_SAVINGS(
-        "Account to Savings",
+        "Account to Goal",
         Icons.Default.AccountBalance,
-        Color(0xFF4CAF50),
+        Color(0xFF2196F3),
         "Transfer to savings goal"
     ),
     SAVINGS_TO_SAVINGS(
-        "Savings to Savings",
+        "Goal to Goal",
         Icons.Default.Savings,
         Color(0xFFE91E63),
         "Move between savings goals"
@@ -144,6 +156,12 @@ fun TransferScreen(
             when (selectedTransferType) {
                 TransferType.ACCOUNT_TO_ACCOUNT -> {
                     AccountTransferSection(uiState = uiState, viewModel = viewModel)
+                }
+                TransferType.ACCOUNT_TO_GENERAL_SAVINGS -> {
+                    GeneralSavingsTransferSection(uiState = uiState, viewModel = viewModel, isToSavings = true)
+                }
+                TransferType.GENERAL_SAVINGS_TO_ACCOUNT -> {
+                    GeneralSavingsTransferSection(uiState = uiState, viewModel = viewModel, isToSavings = false)
                 }
                 TransferType.INCOME_TO_SAVINGS, TransferType.SAVINGS_TO_INCOME -> {
                     IncomeSavingsTransferSection(uiState = uiState, viewModel = viewModel, isIncomeToSavings = selectedTransferType == TransferType.INCOME_TO_SAVINGS)
@@ -240,8 +258,8 @@ fun TransferConfirmationDialog(
                             Text(
                                 when (uiState.transferType) {
                                     TransferType.ACCOUNT_TO_ACCOUNT, TransferType.INCOME_TO_INCOME -> uiState.fromAccount?.name ?: "Select account"
-                                    TransferType.INCOME_TO_SAVINGS, TransferType.ACCOUNT_TO_SAVINGS -> uiState.fromAccount?.name ?: "Select account"
-                                    TransferType.SAVINGS_TO_INCOME -> uiState.selectedSavingsGoal?.name ?: "Select savings"
+                                    TransferType.INCOME_TO_SAVINGS, TransferType.ACCOUNT_TO_SAVINGS, TransferType.ACCOUNT_TO_GENERAL_SAVINGS -> uiState.fromAccount?.name ?: "Select account"
+                                    TransferType.SAVINGS_TO_INCOME, TransferType.GENERAL_SAVINGS_TO_ACCOUNT -> "General Savings"
                                     TransferType.SAVINGS_TO_SAVINGS -> uiState.selectedSavingsGoal?.name ?: "Select savings"
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
@@ -271,6 +289,8 @@ fun TransferConfirmationDialog(
                                     TransferType.ACCOUNT_TO_ACCOUNT, TransferType.INCOME_TO_INCOME -> uiState.toAccount?.name ?: "Select account"
                                     TransferType.INCOME_TO_SAVINGS, TransferType.ACCOUNT_TO_SAVINGS, TransferType.SAVINGS_TO_SAVINGS -> uiState.selectedSavingsGoal?.name ?: "Select savings"
                                     TransferType.SAVINGS_TO_INCOME -> uiState.toAccount?.name ?: "Select account"
+                                    TransferType.ACCOUNT_TO_GENERAL_SAVINGS -> "General Savings"
+                                    TransferType.GENERAL_SAVINGS_TO_ACCOUNT -> uiState.toAccount?.name ?: "Select account"
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
@@ -589,6 +609,131 @@ fun IncomeToIncomeSection(uiState: TransferUiState, viewModel: TransferViewModel
             onAmountChange = { viewModel.updateAmount(it) },
             availableBalance = uiState.fromAccount?.balance ?: 0.0
         )
+    }
+}
+
+@Composable
+fun GeneralSavingsTransferSection(
+    uiState: TransferUiState,
+    viewModel: TransferViewModel,
+    isToSavings: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (isToSavings) {
+            Text(
+                text = "From Account",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AccountSelector(
+                selectedAccount = uiState.fromAccount,
+                accounts = uiState.accounts,
+                onSelect = { viewModel.selectFromAccount(it) }
+            )
+
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = GreenIncome,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(32.dp)
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50).copy(alpha = 0.1f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Savings,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "General Savings",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Your general savings bucket",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            AmountInput(
+                amount = uiState.amount,
+                onAmountChange = { viewModel.updateAmount(it) },
+                availableBalance = uiState.fromAccount?.balance ?: 0.0
+            )
+        } else {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50).copy(alpha = 0.1f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Savings,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "General Savings",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Your general savings bucket",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Icon(
+                Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = RedExpense,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(32.dp)
+            )
+
+            Text(
+                text = "To Account",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            AccountSelector(
+                selectedAccount = uiState.toAccount,
+                accounts = uiState.accounts,
+                onSelect = { viewModel.selectToAccount(it) }
+            )
+
+            AmountInput(
+                amount = uiState.amount,
+                onAmountChange = { viewModel.updateAmount(it) },
+                availableBalance = 0.0
+            )
+        }
     }
 }
 

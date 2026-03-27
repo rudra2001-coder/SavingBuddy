@@ -5,7 +5,23 @@ import android.net.Uri
 import androidx.work.*
 import com.example.savingbuddy.data.local.SavingBuddyDatabase
 import com.example.savingbuddy.data.local.dao.*
-import com.example.savingbuddy.data.local.entity.*
+import com.example.savingbuddy.data.local.dao.WorkLogDao
+import com.example.savingbuddy.data.local.entity.AccountEntity
+import com.example.savingbuddy.data.local.entity.BudgetEntity
+import com.example.savingbuddy.data.local.entity.CategoryEntity
+import com.example.savingbuddy.data.local.entity.CreditCardEntity
+import com.example.savingbuddy.data.local.entity.FocusSessionEntity
+import com.example.savingbuddy.data.local.entity.HabitEntity
+import com.example.savingbuddy.data.local.entity.AchievementEntity
+import com.example.savingbuddy.data.local.entity.HealthEntryEntity
+import com.example.savingbuddy.data.local.entity.JournalEntryEntity
+import com.example.savingbuddy.data.local.entity.LoanEntity
+import com.example.savingbuddy.data.local.entity.MindfulSessionEntity
+import com.example.savingbuddy.data.local.entity.SavingsGoalEntity
+import com.example.savingbuddy.data.local.entity.TaskEntity
+import com.example.savingbuddy.data.local.entity.TransactionEntity
+import com.example.savingbuddy.data.local.entity.UserPreferencesEntity
+import com.example.savingbuddy.data.local.entity.WorkLogEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -42,7 +58,8 @@ class BackupManager @Inject constructor(
     private val focusSessionDao: FocusSessionDao,
     private val taskDao: TaskDao,
     private val mindfulSessionDao: MindfulSessionDao,
-    private val userPreferencesDao: UserPreferencesDao
+    private val userPreferencesDao: UserPreferencesDao,
+    private val workLogDao: WorkLogDao
 ) {
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
     private val backupFileNameFormat = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
@@ -228,6 +245,7 @@ class BackupManager @Inject constructor(
         backup.put("focusSessions", focusSessionDao.getSessionsForDateRange(0, Long.MAX_VALUE).first().toJsonArray())
         backup.put("tasks", taskDao.getTasksForDateRange(0, Long.MAX_VALUE).first().toJsonArray())
         backup.put("mindfulSessions", mindfulSessionDao.getSessionsForDateRange(0, Long.MAX_VALUE).first().toJsonArray())
+        backup.put("workLogs", workLogDao.getAllWorkLogs().first().toJsonArray())
         
         val prefs = userPreferencesDao.getPreferencesSync()
         if (prefs != null) {
@@ -267,6 +285,7 @@ class BackupManager @Inject constructor(
             restoreFocusSessions(backup.getJSONArray("focusSessions"))
             restoreTasks(backup.getJSONArray("tasks"))
             restoreMindfulSessions(backup.getJSONArray("mindfulSessions"))
+            restoreWorkLogs(backup.optJSONArray("workLogs"))
 
             if (backup.has("userPreferences")) {
                 restoreUserPreferences(backup.getJSONObject("userPreferences"))
@@ -293,6 +312,7 @@ class BackupManager @Inject constructor(
         focusSessionDao.deleteAllSessions()
         taskDao.deleteAllTasks()
         mindfulSessionDao.deleteAllSessions()
+        workLogDao.deleteAllWorkLogs()
     }
 
     private suspend fun restoreAccounts(array: JSONArray) {
@@ -528,6 +548,23 @@ class BackupManager @Inject constructor(
                 completed = obj.optBoolean("completed", false),
                 date = obj.optLong("date", System.currentTimeMillis()),
                 createdAt = obj.optLong("createdAt", System.currentTimeMillis())
+            ))
+        }
+    }
+
+    private suspend fun restoreWorkLogs(array: JSONArray?) {
+        array ?: return
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            workLogDao.insertWorkLog(WorkLogEntity(
+                id = obj.getString("id"),
+                date = obj.getLong("date"),
+                dayType = obj.getString("dayType"),
+                workHours = obj.optDouble("workHours", 8.0).toFloat(),
+                overtimeHours = obj.optDouble("overtimeHours", 0.0).toFloat(),
+                note = obj.optString("note"),
+                createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
+                updatedAt = obj.optLong("updatedAt", System.currentTimeMillis())
             ))
         }
     }
@@ -803,6 +840,24 @@ class BackupManager @Inject constructor(
                     put("completed", item.completed)
                     put("date", item.date)
                     put("createdAt", item.createdAt)
+                })
+            }
+        }
+    }
+
+    @JvmName("workLogListToJsonArray")
+    private fun List<WorkLogEntity>.toJsonArray(): JSONArray {
+        return JSONArray().apply {
+            forEach { item ->
+                put(JSONObject().apply {
+                    put("id", item.id)
+                    put("date", item.date)
+                    put("dayType", item.dayType)
+                    put("workHours", item.workHours)
+                    put("overtimeHours", item.overtimeHours)
+                    put("note", item.note)
+                    put("createdAt", item.createdAt)
+                    put("updatedAt", item.updatedAt)
                 })
             }
         }

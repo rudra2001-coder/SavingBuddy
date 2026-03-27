@@ -15,6 +15,7 @@ import com.example.savingbuddy.data.local.mapper.toEntity
 import com.example.savingbuddy.domain.model.*
 import com.example.savingbuddy.domain.repository.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -296,30 +297,38 @@ class WorkLogRepositoryImpl @Inject constructor(
         var totalWorkHours = 0f
         var totalOvertimeHours = 0f
 
-        workLogDao.getWorkLogsForDateRange(startDate, endDate).collect { logs ->
-            logs.forEach { log ->
-                totalWorkHours += log.workHours
-                totalOvertimeHours += log.overtimeHours
+        val logs = workLogDao.getWorkLogsForDateRange(startDate, endDate).first()
+        
+        logs.forEach { log ->
+            totalWorkHours += log.workHours
+            totalOvertimeHours += log.overtimeHours
 
-                when (log.dayType) {
-                    "WORKDAY" -> totalWorkDays++
-                    "OFFICE" -> totalOfficeDays++
-                    "HOME_OFFICE" -> totalHomeOfficeDays++
-                    "OFF_DAY" -> totalOffDays++
-                    "OVERTIME" -> {
-                        totalOvertimeDays++
-                        totalWorkDays++
-                    }
-                    "HOLIDAY" -> totalHolidays++
-                    "SICK_LEAVE" -> totalSickLeaves++
-                    "PAID_LEAVE" -> totalPaidLeaves++
-                    "UNPAID_LEAVE" -> totalUnpaidLeaves++
-                    "BUSINESS_TRIP" -> totalBusinessTrips++
+            when (log.dayType) {
+                "WORKDAY" -> totalWorkDays++
+                "OFFICE" -> {
+                    totalOfficeDays++
+                    totalWorkDays++
                 }
+                "HOME", "HOME_OFFICE" -> {
+                    totalHomeOfficeDays++
+                    totalWorkDays++
+                }
+                "REMOTE" -> totalWorkDays++
+                "OFF_DAY" -> totalOffDays++
+                "OVERTIME" -> {
+                    totalOvertimeDays++
+                    totalWorkDays++
+                }
+                "HOLIDAY" -> totalHolidays++
+                "SICK_LEAVE" -> totalSickLeaves++
+                "PAID_LEAVE" -> totalPaidLeaves++
+                "UNPAID_LEAVE" -> totalUnpaidLeaves++
+                "BUSINESS_TRIP", "TRAVEL" -> totalBusinessTrips++
+                "CUSTOM" -> totalWorkDays++
             }
         }
 
-        val totalDays = totalWorkDays + totalOffDays + totalHolidays + totalSickLeaves + totalPaidLeaves + totalUnpaidLeaves + totalBusinessTrips
+        val totalDays = totalWorkDays + totalOffDays + totalHolidays + totalSickLeaves + totalPaidLeaves + totalUnpaidLeaves + totalBusinessTrips + totalHomeOfficeDays
         val workPercentage = if (totalDays > 0) (totalWorkDays.toFloat() / totalDays * 100) else 0f
         val remotePercentage = if (totalWorkDays > 0) (totalHomeOfficeDays.toFloat() / totalWorkDays * 100) else 0f
 
